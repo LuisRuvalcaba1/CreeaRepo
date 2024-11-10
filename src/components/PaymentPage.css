@@ -1,0 +1,58 @@
+.payment-page {
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 30px;
+    background-color: rgba(255, 255, 255, 0.15); /* Fondo semitransparente con efecto glassmorphism */
+    border-radius: 16px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(15px); /* Efecto blur para un estilo moderno */
+    color: #ffffff; /* Color de texto en Azul Navy */
+  }
+  
+  .payment-page h1 {
+    font-size: 32px;
+    font-family: 'Orbitron', sans-serif; /* Fuente moderna */
+    color: #f8f8f8; /* Color Azure */
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .payment-details {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .payment-details p {
+    font-size: 18px;
+    margin: 5px 0;
+    color: #ffffff;
+  }
+  
+  #paypal-button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+  }
+  
+  .payment-success-message {
+    font-size: 18px;
+    color: #29CFC5; /* Azul Tiffany */
+    text-align: center;
+    margin-top: 20px;
+  }
+  
+  /* Estilos para pantallas móviles */
+  @media (max-width: 768px) {
+    .payment-page {
+      padding: 20px;
+    }
+  
+    .payment-page h1 {
+      font-size: 26px;
+    }
+  
+    .payment-details p {
+      font-size: 16px;
+    }
+  }
+  

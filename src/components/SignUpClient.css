@@ -44,9 +44,9 @@
     height: 40px;
     border-radius: 8px;
     border: 1px solid var(--color-blanco);
-    padding-left: 10px;
+    padding-left: 15px;
     margin-bottom: 20px; /* Añadido margen inferior */
-    font-size: 16px;
+    font-size: 15px;
     color: var(--color-azul-navy);
     box-sizing: border-box;
 }
@@ -79,6 +79,38 @@
 .login-link:hover {
     color: var(--color-azul-tiffany);
 }
+
+.tooltip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;              /* Tamaño del icono */
+    height: 24px;             /* Tamaño del icono */
+    border: 2px solid #337BC2; /* Color del borde */
+    border-radius: 50%;       /* Borde circular */
+    background-color: #f0f4ff; /* Fondo claro para resaltar */
+    color: #337BC2;           /* Color del icono */
+    font-size: 16px;          /* Tamaño de la "i" */
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+.tooltip-content {
+    position: absolute;
+    background-color: #337BC2;
+    border: 1px solid #ffff;
+    padding: 10px;
+    border-radius: 5px;
+    max-width: 300px;
+    font-size: 14px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+}
+
+.tooltip-content ul {
+    padding-left: 16px;
+}
+
 
 /* Diseño responsivo para dispositivos pequeños */
 @media (max-width: 768px) {

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // Importa useNavigate
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; 
 import Header from './Header';
 import Footer from './Footer';
 import './SignUpClient.css';
@@ -21,11 +21,34 @@ const SignUpClient = () => {
         origenPatrimonio: '',
         habitosToxicos: '',
         especificarHabitos: '',
-        password: ''
+        password: '',
+        idAsesorSeleccionado: '' 
     });
 
     const [errors, setErrors] = useState({});
-    const navigate = useNavigate(); // Define el hook useNavigate
+    const [asesores, setAsesores] = useState([]); 
+    const [showTooltip, setShowTooltip] = useState(false);
+
+    const navigate = useNavigate();
+
+    const handleTooltipToggle = () => {
+        setShowTooltip(!showTooltip); 
+    };
+
+    useEffect(() => {
+        const fetchAsesores = async () => {
+            try {
+                const response = await fetch('/api/obtener-asesores'); 
+                const data = await response.json();
+                setAsesores(data); 
+            } catch (error) {
+                console.error('Error al obtener asesores:', error);
+            }
+        };
+    
+        fetchAsesores();
+    }, []);
+    ;
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -137,7 +160,6 @@ const SignUpClient = () => {
                 const data = await response.json();
     
                 if (response.ok) {
-                    // Redirigir a la página de verificación de código
                     navigate('/verify-code', { state: { email: formData.correo } });
                 } else {
                     alert(data.message || 'Error al registrar el cliente');
@@ -150,14 +172,13 @@ const SignUpClient = () => {
             console.log('Formulario inválido. Corrige los errores y vuelve a intentar.');
         }
     };
-    
 
     return (
         <div className="App">
             <Header />
             <div className="signup-container">
                 <div className="signup-box">
-                    <h2>Sign In</h2>
+                    <h2>Registro de Cliente</h2>
                     <form onSubmit={handleSubmit}>
                         <input
                             type="text"
@@ -270,7 +291,39 @@ const SignUpClient = () => {
                             onChange={handleChange}
                         >
                             <option value="">Entidad Federativa de nacimiento</option>
-                            {/* Lista de opciones */}
+                            {/* Lista de opciones de entidades federativas */}
+                            <option value="Aguascalientes">Aguascalientes</option>
+                            <option value="Baja California">Baja California</option>
+                            <option value="Baja California Sur">Baja California Sur</option>
+                            <option value="Campeche">Campeche</option>
+                            <option value="Chiapas">Chiapas</option>
+                            <option value="Chihuahua">Chihuahua</option>
+                            <option value="Ciudad de México">Ciudad de México</option>
+                            <option value="Coahuila">Coahuila</option>
+                            <option value="Colima">Colima</option>
+                            <option value="Durango">Durango</option>
+                            <option value="Estado de México">Estado de México</option>
+                            <option value="Guanajuato">Guanajuato</option>
+                            <option value="Guerrero">Guerrero</option>
+                            <option value="Hidalgo">Hidalgo</option>
+                            <option value="Jalisco">Jalisco</option>
+                            <option value="Michoacán">Michoacán</option>
+                            <option value="Morelos">Morelos</option>
+                            <option value="Nayarit">Nayarit</option>
+                            <option value="Nuevo León">Nuevo León</option>
+                            <option value="Oaxaca">Oaxaca</option>
+                            <option value="Puebla">Puebla</option>
+                            <option value="Querétaro">Querétaro</option>
+                            <option value="Quintana Roo">Quintana Roo</option>
+                            <option value="San Luis Potosí">San Luis Potosí</option>
+                            <option value="Sinaloa">Sinaloa</option>
+                            <option value="Sonora">Sonora</option>
+                            <option value="Tabasco">Tabasco</option>
+                            <option value="Tamaulipas">Tamaulipas</option>
+                            <option value="Tlaxcala">Tlaxcala</option>
+                            <option value="Veracruz">Veracruz</option>
+                            <option value="Yucatán">Yucatán</option>
+                            <option value="Zacatecas">Zacatecas</option>
                         </select>
                         {errors.entidadFederativa && <div className="error">{errors.entidadFederativa}</div>}
 
@@ -304,6 +357,24 @@ const SignUpClient = () => {
                             <option value="No">No</option>
                             <option value="Sí">Sí</option>
                         </select>
+                        <span
+                            className="tooltip-icon"
+                            onMouseEnter={handleTooltipToggle}
+                            onMouseLeave={handleTooltipToggle}
+                        > ℹ
+                        </span>
+                        {showTooltip && (
+                            <div className="tooltip-content">
+                                <p>Indique cualquier hábito relacionado con el consumo de sustancias que pueda afectar su salud. Esto incluye:</p>
+                                <ul>
+                                    <li><strong>Tabaco:</strong> Ej., Cigarrillos - 10 al día</li>
+                                    <li><strong>Alcohol:</strong> Ej., Vino - 2-3 copas/semana</li>
+                                    <li><strong>Sustancias Recreativas:</strong> Ej., Cannabis - Ocasional</li>
+                                    <li><strong>Medicamentos Controlados:</strong> Ej., Benzodiacepinas (si no han sido prescritas)</li>
+                                </ul>
+                                <p>Proporcione detalles como el tipo, frecuencia y cantidad aproximada.</p>
+                            </div>
+                        )}
                         {errors.habitosToxicos && <div className="error">{errors.habitosToxicos}</div>}
 
                         {formData.habitosToxicos === 'Sí' && (
@@ -329,7 +400,22 @@ const SignUpClient = () => {
                             onChange={handleChange}
                         />
                         {errors.password && <div className="error">{errors.password}</div>}
-                    
+
+                        {/* Campo de selección de asesor */}
+                        <select
+                            name="idAsesorSeleccionado"
+                            className="signup-input"
+                            value={formData.idAsesorSeleccionado}
+                            onChange={handleChange}
+                        >
+                            <option value="">Seleccione un asesor o deje vacío para asignación automática</option>
+                            {asesores.map((asesor) => (
+                                <option key={asesor.id_asesor} value={asesor.id_asesor}>
+                                    {asesor.nombre_completo} - {asesor.clave_agente}
+                                </option>
+                            ))}
+                        </select>
+
                         <button type="submit" className="signup-button">Registrarse</button>
                     </form>
                 </div>

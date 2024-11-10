@@ -24,7 +24,7 @@ const VerifyCode = () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ email, verificationCode }),
+                body: JSON.stringify({ email, verificationCode: verificationCode.trim() }),
             });
 
             const data = await response.json();

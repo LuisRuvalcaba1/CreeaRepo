@@ -1,0 +1,106 @@
+/* Contenedor principal */
+.financial-projection-container {
+    background: url('../assets/background.jpg') no-repeat center center/cover; /* Fondo de pantalla */
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-blanco);
+    font-family: 'Roboto', sans-serif;
+}
+
+/* Caja del formulario con estilo Glassmorphism */
+.financial-projection-box {
+    background: rgba(255, 255, 255, 0.1); /* Fondo semitransparente */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    width: 90%;
+    max-width: 500px; /* Ancho máximo */
+    padding: 40px;
+    border-radius: 20px; /* Bordes redondeados */
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); /* Sombra */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Estilo del título */
+.financial-projection-box h2 {
+    font-size: 36px;
+    margin-bottom: 20px;
+    color: var(--color-blanco);
+    font-family: 'Orbitron', sans-serif; /* Fuente Orbitron */
+}
+
+/* Estilos para los labels */
+.financial-projection-box label {
+    font-size: 16px;
+    color: var(--color-blanco);
+    margin-top: 15px;
+    text-align: left;
+    width: 100%; /* Alineación a la izquierda */
+}
+
+/* Estilos para los inputs de texto y el select */
+.financial-projection-box input[type="text"],
+.financial-projection-box select {
+    width: 100%;
+    height: 40px;
+    margin-top: 5px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border: none;
+    padding-left: 10px;
+    font-size: 16px;
+    color: var(--color-azul-navy);
+    font-family: 'Roboto', sans-serif;
+}
+
+/* Estilo para el botón */
+.financial-projection-box button[type="submit"] {
+    width: 100%;
+    height: 45px;
+    background-color: var(--color-amarillo-canario);
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    color: var(--color-blanco);
+    cursor: pointer;
+    font-family: 'Orbitron', sans-serif;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+    margin-top: 20px;
+}
+
+.financial-projection-box button[type="submit"]:hover {
+    background-color: rgba(136, 13, 236, 0.532);
+    transform: scale(1.05);
+}
+
+/* Estilo para los mensajes de error */
+.financial-projection-box span {
+    font-size: 14px;
+    color: rgb(255, 128, 128); /* Color de error */
+    margin-top: -10px;
+    margin-bottom: 10px;
+}
+
+/* Estilo para el mensaje de éxito */
+.financial-projection-box .success-message {
+    font-size: 16px;
+    color: var(--color-verde); /* Ajusta según la paleta de colores */
+    margin-top: 15px;
+}
+
+/* Media queries para pantallas pequeñas */
+@media (max-width: 768px) {
+    .financial-projection-box {
+        width: 100%;
+        padding: 20px;
+    }
+    .financial-projection-box h2 {
+        font-size: 24px;
+    }
+    .financial-projection-box button[type="submit"] {
+        font-size: 16px;
+    }
+}

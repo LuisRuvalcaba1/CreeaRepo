@@ -1,0 +1,149 @@
+/* Importa la fuente Orbitron desde Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+/* Contenedor principal del calendario */
+.calendar-container {
+    background: rgba(255, 255, 255, 0.1); /* Glassmorphism */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 15px;
+    padding: 20px;
+    margin: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    color: #ffffff;
+    font-family: 'Orbitron', sans-serif;
+}
+
+/* Estilos del calendario */
+.rbc-calendar {
+    background: transparent;
+    color: #ffffff;
+    border: none;
+    font-family: 'Orbitron', sans-serif;
+}
+
+/* Toolbar (barra de herramientas del calendario) */
+.rbc-toolbar {
+    background: rgba(41, 207, 197, 0.2); /* Azul Tiffany con glass effect */
+    padding: 10px;
+    border-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+/* Botones de la barra de herramientas */
+.rbc-toolbar button {
+    background: rgba(255, 255, 255, 0.1);
+    color: #01274D;
+    border: none;
+    border-radius: 5px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-family: 'Orbitron', sans-serif;
+    transition: all 0.3s ease;
+}
+
+.rbc-toolbar button:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+/* Estilos para los días y las celdas del calendario */
+.rbc-day-bg {
+    background-color: rgba(255, 255, 255, 0.05);
+    transition: background-color 0.3s;
+}
+
+.rbc-day-bg:hover {
+    background-color: rgba(41, 207, 197, 0.2);
+}
+
+/* Día actual */
+.rbc-today {
+    background-color: rgba(255, 255, 255, 0.15); /* Resalta el día actual */
+}
+
+/* Eventos en el calendario */
+.rbc-event {
+    background-color: #FFFF00; /* Amarillo Canario para eventos */
+    color: #01274D;
+    border-radius: 5px;
+    padding: 4px;
+    font-weight: bold;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.rbc-event:hover {
+    background-color: #337BC2;
+    color: #ffffff;
+}
+
+/* Encabezados de los días de la semana */
+.rbc-header {
+    padding: 8px 0;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    font-weight: 600;
+    text-align: center;
+    border-bottom: 1px solid rgba(41, 207, 197, 0.3);
+}
+
+/* Números de los días en el calendario */
+.rbc-date-cell {
+    color: #ffffff;
+}
+
+/* Contenido de las horas y franjas de tiempo */
+.rbc-time-content {
+    border-top: 2px solid #337BC2;
+    scrollbar-width: thin;
+    scrollbar-color: #337BC2 #01274D;
+}
+
+.rbc-time-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.rbc-time-content::-webkit-scrollbar-thumb {
+    background-color: #337BC2;
+    border-radius: 10px;
+}
+
+.rbc-time-content::-webkit-scrollbar-track {
+    background: #01274D;
+}
+
+/* Botones de navegación del calendario */
+.rbc-nav-button {
+    color: #ffffff;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 5px 10px;
+    transition: color 0.3s;
+}
+
+.rbc-nav-button:hover {
+    color: #29CFC5;
+}
+
+/* Mensajes de error y avisos */
+.error-message {
+    color: #ffffff;
+    font-size: 14px;
+    margin-top: 10px;
+    font-family: 'Orbitron', sans-serif;
+    text-align: center;
+}
+
+/* Mensajes de confirmación */
+.confirmation-message {
+    color: #29CFC5;
+    font-size: 14px;
+    margin-top: 10px;
+    font-family: 'Orbitron', sans-serif;
+    text-align: center;
+}

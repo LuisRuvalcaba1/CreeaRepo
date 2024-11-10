@@ -1,0 +1,96 @@
+/* Estilos generales para la página del tablero (BoardPage) */
+.board-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: url('../assets/background.jpg') no-repeat center center/cover;
+  padding-top: 60px; /* Ajuste para dejar espacio para la barra de herramientas */
+  box-sizing: border-box; 
+}
+
+/* Estilos para el canvas */
+canvas {
+  display: block;
+  margin: 0 auto;
+  border: 2px solid #337BC2;
+  background-color: white;
+  width: 100vw; /* O usa una proporción adecuada */
+  height: 80vh;
+  box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.1);
+  margin-top: 20px;
+  border-radius: 8px;
+}
+
+/* Estilos generales del body */
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow: hidden; /* Ocultar barras de scroll */
+}
+
+/* Estilos para la toolbar */
+.toolbar {
+  display: flex;
+  justify-content: center; /* Centrar los elementos de la toolbar */
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1); /* Fondo translúcido */
+  backdrop-filter: blur(10px); /* Efecto glassmorphism */
+  border-radius: 15px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  padding: 10px 20px;
+  position: fixed; /* Fijar la barra en la parte superior */
+  top: 0;
+  left: 0;
+  width: 100%; /* Ocupa todo el ancho de la pantalla */
+  z-index: 1000; /* Asegura que esté encima del contenido */
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  gap: 20px; /* Espacio entre los elementos */
+}
+
+/* Estilos para los controles dentro de la toolbar */
+.toolbar select, 
+.toolbar input[type="color"], 
+.toolbar input[type="range"], 
+.toolbar button {
+  background-color: #337BC2; /* Fondo azul */
+  color: rgb(255, 255, 255);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  margin: 0 10px;
+  backdrop-filter: blur(10px); /* Efecto de desenfoque */
+  transition: all 0.3s ease; /* Transición suave */
+}
+
+.toolbar select:hover, 
+.toolbar input[type="color"]:hover, 
+.toolbar input[type="range"]:hover, 
+.toolbar button:hover {
+  background-color: rgba(11, 51, 84, 0.709); /* Aumentar transparencia al pasar el mouse */
+}
+
+/* Estilos adicionales para inputs ocultos */
+input[type="file"] {
+  display: none;
+}
+
+/* Adaptar la toolbar a pantallas pequeñas */
+@media (max-width: 768px) {
+  .toolbar {
+    flex-direction: column;
+    gap: 10px; /* Ajuste de espacio en pantallas pequeñas */
+  }
+
+  .toolbar select, 
+  .toolbar input[type="color"], 
+  .toolbar input[type="range"], 
+  .toolbar button {
+    width: 100%; /* Ocupa todo el ancho del contenedor en pantallas pequeñas */
+    margin: 5px 0;
+  }
+}

@@ -1,98 +1,128 @@
-// src/components/Chatbot.js
-import React, { useState } from 'react';
-import './Chatbot.css'; // Estilos para el chatbot
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import './Chatbot.css';
 
-const Chatbot = ({ userType }) => {
-  const [activeTab, setActiveTab] = useState('preguntas');
-  const [questions, setQuestions] = useState([
-    { question: '¿Cómo puedo cambiar mi contraseña?', answer: 'Dirígete a la sección de configuración para cambiar tu contraseña.' },
-    { question: '¿Cómo actualizo mi información personal?', answer: 'Puedes actualizar tu información en la sección de perfil.' }
-  ]);
+const Chatbot = () => {
+    const [messages, setMessages] = useState([]);
+    const [input, setInput] = useState('');
+    const [selectedOption, setSelectedOption] = useState('');
+    const [clientOptions, setClientOptions] = useState([]); // Opciones de últimos clientes
 
-  // Función para editar preguntas (solo disponible para promotores/administradores)
-  const handleEdit = (index, field, value) => {
-    const updatedQuestions = [...questions];
-    updatedQuestions[index][field] = value;
-    setQuestions(updatedQuestions);
-  };
+    // Efecto para cargar dinámicamente los clientes
+    useEffect(() => {
+        const loadClients = async () => {
+            try {
+                const response = await axios.get('http://localhost:5000/api/clients'); // Ejemplo de endpoint
+                setClientOptions(response.data.clients); // Actualiza las opciones de clientes
+            } catch (error) {
+                console.error('Error al cargar los clientes:', error);
+            }
+        };
 
-  return (
-    <div className="chatbot-container">
-      <div className="chatbot-tabs">
-        <button
-          className={`tab ${activeTab === 'preguntas' ? 'active' : ''}`}
-          onClick={() => setActiveTab('preguntas')}
-        >
-          Preguntas y Respuestas
-        </button>
-        {userType === 'asesor' && (
-          <button
-            className={`tab ${activeTab === 'sugerencias' ? 'active' : ''}`}
-            onClick={() => setActiveTab('sugerencias')}
-          >
-            Sugerencias de Productos
-          </button>
-        )}
-      </div>
+        loadClients(); // Carga los clientes al montar el componente
+    }, []);
 
-      {/* Preguntas y Respuestas */}
-      {activeTab === 'preguntas' && (
+    const handleSendMessage = async () => {
+        if (!input.trim()) return;
+    
+        const userMessage = input.toLowerCase();
+        setInput(''); // Limpia el input inmediatamente
+    
+        // Verificar si la última respuesta fue una invitación a contactar a un capacitador
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage && lastMessage.text.includes("¿Deseas contactar a un capacitador?")) {
+            if (userMessage === "si") {
+                const whatsappNumber = '+523334648999'; // Número de WhatsApp del capacitador
+                const whatsappUrl = `https://wa.me/${whatsappNumber.replace('+', '')}?text=Hola,%20tengo%20una%20pregunta`;
+                window.location.href = whatsappUrl;
+                return;
+            } else if (userMessage === "no") {
+                setMessages((prevMessages) => [
+                    ...prevMessages,
+                    { sender: 'bot', text: "¿Tienes otra pregunta?" }
+                ]);
+                return;
+            }
+        }
+    
+        try {
+            // Enviar la pregunta al backend
+            const response = await axios.post('http://localhost:5000/api/chatbot', { userQuestion: userMessage });
+    
+            // Asegúrate de que botResponse sea un string
+            const botResponse = typeof response.data.response === 'string' ? response.data.response : "No se encontró una respuesta adecuada. ¿Deseas contactar a un capacitador?";
+            const contactOption = response.data.contactOption || false;
+    
+            // Añadir el mensaje del usuario
+            setMessages((prevMessages) => [
+                ...prevMessages,
+                { sender: 'user', text: userMessage }
+            ]);
+    
+            // Manejar la respuesta del chatbot y mostrar solo el texto deseado
+            if (contactOption) {
+                setMessages((prevMessages) => [
+                    ...prevMessages,
+                    { sender: 'bot', text: "No encontré una respuesta a tu pregunta. ¿Deseas contactar a un capacitador?" }
+                ]);
+            } else {
+                setMessages((prevMessages) => [
+                    ...prevMessages,
+                    { sender: 'bot', text: botResponse }
+                ]);
+            }
+        } catch (error) {
+            console.error('Error al enviar la pregunta:', error);
+            setMessages((prevMessages) => [
+                ...prevMessages,
+                { sender: 'user', text: userMessage },
+                { sender: 'bot', text: 'Error al obtener respuesta' }
+            ]);
+        }
+    };
+    
+    
+    return (
         <div className="chatbot-content">
-          <h3>Preguntas y Respuestas</h3>
-          <ul className="questions-list">
-            {questions.map((q, index) => (
-              <li key={index}>
-                <strong>Pregunta: </strong>
-                {userType === 'promotor' ? (
-                  <input
-                    type="text"
-                    value={q.question}
-                    onChange={(e) => handleEdit(index, 'question', e.target.value)}
-                  />
-                ) : (
-                  q.question
-                )}
-                <br />
-                <strong>Respuesta: </strong>
-                {userType === 'promotor' ? (
-                  <input
-                    type="text"
-                    value={q.answer}
-                    onChange={(e) => handleEdit(index, 'answer', e.target.value)}
-                  />
-                ) : (
-                  q.answer
-                )}
-              </li>
-            ))}
-          </ul>
+            {/* Renderizado de los mensajes */}
+            <div className="chatbot-messages">
+                {messages.map((message, index) => (
+                    <div key={index} className={`message ${message.sender}`}>
+                        {message.text}
+                    </div>
+                ))}
+            </div>
 
-          {/* Redirección a WhatsApp si no hay respuesta */}
-          <div className="whatsapp-redirect">
-            <p>
-              ¿No encuentras la respuesta?{' '}
-              <a href="https://wa.me/3334648999" target="_blank" rel="noopener noreferrer">
-                Contacta a un capacitador en WhatsApp
-              </a>
-            </p>
-          </div>
-        </div>
-      )}
+            <div className="chatbot-menu">
+                <select value={selectedOption} onChange={(e) => setSelectedOption(e.target.value)}>
+                    <option value="">Selecciona una opción</option>
+                    <option value="faq">Preguntas y Respuestas</option>
+                    <option value="product-suggestions">Sugerencias de Productos</option>
+                </select>
+            </div>
 
-      {/* Sugerencias de Productos (solo visible para Asesores) */}
-      {activeTab === 'sugerencias' && userType === 'asesor' && (
-        <div className="chatbot-content">
-          <h3>Sugerencias de Productos</h3>
-          <select>
-            <option>Cliente 1</option>
-            <option>Cliente 2</option>
-            <option>Cliente 3</option>
-          </select>
-          <p>Basado en las notas de la última reunión, sugerimos el producto XYZ.</p>
+            {selectedOption === 'product-suggestions' && (
+                <div className="client-menu">
+                    <select>
+                        <option value="">Selecciona un cliente</option>
+                        {clientOptions.map((client, index) => (
+                            <option key={index} value={client}>{client}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
+            <div className="chatbot-input">
+                <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Escribe tu pregunta..."
+                />
+                <button onClick={handleSendMessage}>Enviar</button>
+            </div>
         </div>
-      )}
-    </div>
-  );
+    );
 };
 
 export default Chatbot;

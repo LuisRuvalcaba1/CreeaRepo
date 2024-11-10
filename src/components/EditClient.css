@@ -1,0 +1,63 @@
+/* EditClient.css */
+.edit-client-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
+
+.edit-client-content {
+    width: 100%;
+    max-width: 500px;
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.edit-client-content h2 {
+    text-align: center;
+    color: #333;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.edit-client-content label {
+    display: block;
+    font-size: 14px;
+    color: #555;
+    margin-top: 10px;
+}
+
+.edit-client-content input[type="text"],
+.edit-client-content input[type="email"],
+.edit-client-content input[type="password"] {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    font-size: 14px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.edit-client-content .error {
+    color: #d9534f;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+.edit-client-content button {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    color: #fff;
+    background-color: #337ab7;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 20px;
+}
+
+.edit-client-content button:hover {
+    background-color: #286090;
+}

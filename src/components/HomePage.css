@@ -1,153 +1,141 @@
-/* Importa la fuente Orbitron desde Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+    /* Importa la fuente Orbitron desde Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
 
-/* App Component */
-.App {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    background: url('../assets/background.jpg') no-repeat center center/cover;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    font-family: 'Orbitron', sans-serif; 
-}
+    /* App Component */
+    .App {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background: url('../assets/background.jpg') no-repeat center center/cover;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-family: 'Orbitron', sans-serif; 
+    }
 
-/* Header Component */
-.app-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 40px;
-    background: transparent;
-    color: white;
-    z-index: 10;
-    font-family: 'Orbitron', sans-serif; /* Aplica Orbitron al header */
-}
+    .logo {
+        display: flex;
+        align-items: center;
+    }
 
-.logo {
-    display: flex;
-    align-items: center;
-}
+    .logo h1 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 600;
+    }
 
-.logo h1 {
-    margin: 0;
-    font-size: 28px;
-    font-weight: 600;
-}
+    .logo-img {
+        height: 50px;
+        margin-right: 15px;
+    }
 
-.logo-img {
-    height: 50px;
-    margin-right: 15px;
-}
+    .nav-links {
+        list-style: none;
+        display: flex;
+        gap: 30px;
+        margin: 0;
+        padding: 0;
+    }
 
-.nav-links {
-    list-style: none;
-    display: flex;
-    gap: 30px;
-    margin: 0;
-    padding: 0;
-}
+    .nav-links li {
+        font-size: 18px;
+        font-weight: 500;
+    }
 
-.nav-links li {
-    font-size: 18px;
-    font-weight: 500;
-}
+    .nav-links a {
+        color: #FFFFFF;
+        text-decoration: none;
+        padding: 8px 12px;
+        border-radius: 4px;
+        transition: background-color 0.3s ease, color 0.3s ease;
+    }
 
-.nav-links a {
-    color: #FFFFFF;
-    text-decoration: none;
-    padding: 8px 12px;
-    border-radius: 4px;
-    transition: background-color 0.3s ease, color 0.3s ease;
-}
+    .nav-links a:hover {
+        background-color: #07c5ff;
+        color: #ffffff;
+    }
 
-.nav-links a:hover {
-    background-color: #07c5ff;
-    color: #ffffff;
-}
+    /* Main Home Page Content */
+    .home-page {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        padding: 20px;
+        color: white;
+        font-family: 'Orbitron', sans-serif; /* Aplica Orbitron al contenido principal */
+    }
 
-/* Main Home Page Content */
-.home-page {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    padding: 20px;
-    color: white;
-    font-family: 'Orbitron', sans-serif; /* Aplica Orbitron al contenido principal */
-}
+    .home-page h2 {
+        font-size: 50px;
+        margin-bottom: 20px;
+    }
 
-.home-page h2 {
-    font-size: 50px;
-    margin-bottom: 20px;
-}
+    .home-page p {
+        font-size: 20px;
+        margin-bottom: 40px;
+        max-width: 600px;
+    }
 
-.home-page p {
-    font-size: 20px;
-    margin-bottom: 40px;
-    max-width: 600px;
-}
+    .cta-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+    }
 
-.cta-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-}
+    /* Botones Glassmorphism */
+    button {
+        font-size: 18px;
+        padding: 15px 30px;
+        color: white;
+        border: none;
+        border-radius: 25px;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        cursor: pointer;
+        transition: background-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
+        font-family: 'Orbitron', sans-serif; /* Aplica Orbitron a los botones */
+    }
 
-/* Botones Glassmorphism */
-button {
-    font-size: 18px;
-    padding: 15px 30px;
-    color: white;
-    border: none;
-    border-radius: 25px;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    cursor: pointer;
-    transition: background-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
-    font-family: 'Orbitron', sans-serif; /* Aplica Orbitron a los botones */
-}
+    button.secondary {
+        background: rgba(41, 207, 197, 0.1);
+        border: 1px solid rgba(41, 207, 197, 0.18);
+    }
 
-button.secondary {
-    background: rgba(41, 207, 197, 0.1);
-    border: 1px solid rgba(41, 207, 197, 0.18);
-}
+    button:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(1.05);
+    }
 
-button:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(1.05);
-}
+    /* Footer Component */
+    .app-footer {
+        padding: 20px;
+        text-align: center;
+        background: transparent;
+        color: white;
+        z-index: 10;
+        width: 100%;
+        font-family: 'Orbitron', sans-serif; /* Aplica Orbitron al footer */
+    }
 
-/* Footer Component */
-.app-footer {
-    padding: 20px;
-    text-align: center;
-    background: transparent;
-    color: white;
-    z-index: 10;
-    width: 100%;
-    font-family: 'Orbitron', sans-serif; /* Aplica Orbitron al footer */
-}
+    .app-footer p {
+        margin: 5px 0;
+        font-size: 16px;
+    }
 
-.app-footer p {
-    margin: 5px 0;
-    font-size: 16px;
-}
+    .app-footer a {
+        color: #29CFC5;
+        text-decoration: none;
+        margin: 0 10px;
+        font-size: 16px;
+        transition: color 0.3s ease;
+    }
 
-.app-footer a {
-    color: #29CFC5;
-    text-decoration: none;
-    margin: 0 10px;
-    font-size: 16px;
-    transition: color 0.3s ease;
-}
-
-.app-footer a:hover {
-    color: #FFFFFF;
-}
+    .app-footer a:hover {
+        color: #FFFFFF;
+    }

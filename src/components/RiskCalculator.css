@@ -1,0 +1,206 @@
+/* General styles for the app */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  
+  .main-content {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  }
+  
+  .risk-calculator-container {
+    width: 80%;
+    max-width: 900px;
+    background-color: rgba(255, 255, 255, 0.1); /* Glassmorphism effect */
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+    color: rgb(255, 255, 255);
+  }
+  
+  /* Navigation buttons at the top of the calculator */
+  .risk-nav {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+  }
+  
+  .risk-nav button {
+    background-color: rgba(41, 207, 197, 0.7); /* Azul Tiffany */
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 10px;
+    color: #ffffff; /* Blanco */
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .risk-nav button:hover {
+    background-color: rgba(41, 207, 197, 1); /* Azul Tiffany completo */
+  }
+  
+  /* Styles for the interactive form */
+  .risk-form label {
+    display: block;
+    margin-bottom: 10px;
+  }
+  
+  .risk-form input, .risk-form select {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    border: none;
+    background-color: #0382f9; /* Light white for input background */
+    color: rgb(255, 255, 255);
+  }
+  
+  .risk-form input::placeholder {
+    color: #0382f9; /* Light gray for placeholder text */
+  }
+  
+  .habit-icons {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  
+  .habit-icons label {
+    margin-right: 10px;
+  }
+  
+  .calculate-button {
+    background-color: #FFFF00; /* Amarillo Canario */
+    color: #01274D; /* Azul Navy */
+    border: none;
+    padding: 10px 20px;
+    font-size: 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .calculate-button:hover {
+    background-color: #E5E500; /* Amarillo más oscuro */
+  }
+  
+  /* Styles for the evaluation and comparison sections */
+  .evaluation-container {
+    margin-top: 20px;
+  }
+  
+  .comparison-container {
+    margin-top: 20px;
+  }
+  
+  .comparison-container h3, .evaluation-container h3 {
+    margin-bottom: 15px;
+  }
+  
+  /* Graph styling */
+  .chart-container {
+    max-width: 400px;
+    margin: 0 auto;
+  }
+  
+  /* Education about risks section */
+  .education-container {
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-around;
+  }
+  
+  .education-card {
+    background-color: rgba(255, 255, 255, 0.1); /* Light glassmorphism effect */
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    width: 200px;
+    transition: transform 0.3s ease;
+  }
+  
+  .education-card:hover {
+    transform: scale(1.05);
+  }
+  
+  .education-card h4 {
+    margin-bottom: 10px;
+  }
+  
+  .education-card p {
+    font-size: 14px;
+    color: #f1f1f1;
+  }
+  
+  /* Information of reference section */
+  .reference-container {
+    margin-top: 20px;
+  }
+  
+  .reference-container ul {
+    list-style-type: none;
+    padding: 0;
+  }
+  
+  .reference-container ul li {
+    margin-bottom: 10px;
+    font-size: 14px;
+  }
+  
+  .reference-container ul li a {
+    color: #29CFC5; /* Azul Tiffany */
+    text-decoration: none;
+  }
+  
+  .reference-container ul li a:hover {
+    color: #ffffff; /* Blanco */
+  }
+  
+  .reset-button {
+    background-color: #337BC2;
+    color: white;
+    border-radius: 10px;
+    padding: 10px 20px;
+    margin-top: 20px;
+    cursor: pointer;
+  }
+  
+  
+  /* Media queries for responsiveness */
+  @media (max-width: 768px) {
+    .risk-calculator-container {
+      width: 95%;
+      padding: 20px;
+    }
+  
+    .risk-nav button {
+      padding: 8px 15px;
+      font-size: 14px;
+    }
+  
+    .habit-icons {
+      flex-direction: column;
+    }
+  
+    .education-container {
+      flex-direction: column;
+    }
+  
+    .education-card {
+      width: 100%;
+      margin-bottom: 20px;
+    }
+  
+    .chart-container {
+      width: 100%;
+      max-width: 300px;
+    }
+  }
+  

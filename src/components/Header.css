@@ -1,15 +1,16 @@
 /* src/components/Header.css */
 
 .app-header {
-    background-color: #01274D; /* Azul Navy */
-    color: #FFFFFF; /* Blanco */
+    background: transparent;
+    color: white;
     display: flex;
-    justify-content: space-between;
     align-items: center;
     padding: 20px 40px;
-    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); /* Agrega una ligera sombra para darle profundidad */
     position: sticky; /* Hace que el header se quede fijo al hacer scroll */
     top: 0;
+    width: 95%; /* Asegura que ocupe todo el ancho */
+    max-width: 100vw; /* Evita que se corte en algunos tamaños de pantalla */
+    font-family: 'Orbitron', sans-serif;
     z-index: 1000;
 }
 
@@ -54,3 +55,17 @@
     background-color: #592bef; 
     color: #01274D; /* Azul Navy */
 }
+
+.link-button {
+    background: none;
+    border: none;
+    color: #ffffff; /* Color similar al de los enlaces */
+    cursor: pointer;
+    font-size: inherit;
+    padding: 0;
+}
+
+.link-button:hover {
+    text-decoration: background-color 0.3s ease, color 0.3s ease;
+}
+

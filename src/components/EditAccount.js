@@ -13,38 +13,49 @@ const EditAccount = () => {
         sexo: '',
         estadoCivil: '',
         domicilio: '',
+        correoElectronico: '',
         giro: '',
-        habitosToxicos: '',
+        tipoActividad: '',
         entidadFederativa: '',
         ingresosAnuales: '',
-        correo: '',
-        estatus: ''
+        origenPatrimonio: '',
+        habitosToxicos: '',
+        descripcionHabitos: '',
+        password: '',
     });
 
     const navigate = useNavigate();
+    const userId = sessionStorage.getItem('userId'); // Obtiene el userId del sessionStorage
 
     useEffect(() => {
-        // Obtención de datos del usuario de la base de datos.
         const fetchUserData = async () => {
+            if (!userId) {
+                console.error("userId no encontrado en sessionStorage");
+                return;
+            }
+
             try {
-                const response = await fetch('/api/user-data?userId=1'); // Ajusta el userId según corresponda
+                const response = await fetch(`/api/client-data?userId=${userId}`);
                 const data = await response.json();
 
                 if (response.ok) {
                     setFormData({
                         nombreCompleto: data.nombre_completo,
-                        fechaNacimiento: data.fecha_nacimiento,
+                        fechaNacimiento: new Date(data.fecha_nacimiento).toISOString().split('T')[0],
                         nacionalidad: data.nacionalidad,
                         ocupacion: data.ocupacion_profesion,
                         sexo: data.sexo,
                         estadoCivil: data.estado_civil,
                         domicilio: data.domicilio_completo,
+                        correoElectronico: data.correo_electronico,
                         giro: data.giro_actividad,
-                        habitosToxicos: data.habitos_toxicologicos,
+                        tipoActividad: data.tipo_actividad,
                         entidadFederativa: data.entidad_federativa_nacimiento,
                         ingresosAnuales: data.ingresos_anuales,
-                        correo: data.correo_electronico,
-                        estatus: data.estatus // Suponiendo que el estatus es parte de los datos que recuperas
+                        origenPatrimonio: data.origen_patrimonio,
+                        habitosToxicos: data.habitos_toxicologicos,
+                        descripcionHabitos: data.descripcion_habitos || '',
+                        password: data.password,
                     });
                 } else {
                     console.error('Error al obtener los datos del usuario:', data.message);
@@ -55,7 +66,7 @@ const EditAccount = () => {
         };
 
         fetchUserData();
-    }, []);
+    }, [userId]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -67,8 +78,14 @@ const EditAccount = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (!userId) {
+            alert('No se pudo actualizar el perfil. ID de usuario no encontrado.');
+            return;
+        }
+
         try {
-            const response = await fetch(`/api/update-user?userId=1`, { // Ajusta el userId según corresponda
+            const response = await fetch(`/api/update-client?userId=${userId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -78,10 +95,10 @@ const EditAccount = () => {
 
             const data = await response.json();
             if (response.ok) {
-                alert('Datos actualizados correctamente');
-                navigate('/client-home'); // Redirige a la página principal del cliente
+                alert('Perfil actualizado correctamente');
+                navigate('/client-home');
             } else {
-                alert(data.message || 'Error al actualizar los datos');
+                alert(data.message || 'Error al actualizar el perfil');
             }
         } catch (error) {
             console.error('Error durante la actualización:', error);
@@ -90,128 +107,161 @@ const EditAccount = () => {
     };
 
     return (
-        <div className="App">
+        <div className="edit-account-container">
             <Header />
-            <div className="edit-account-container">
-                <div className="edit-account-content">
-                    <div className="profile-header">
-                        <div className="profile-info">
-                            <p>{formData.correo}</p>
-                            <p>Cliente</p>
-                            <p>{formData.estatus}</p>
-                            <button className="change-button">Cambiar Nombre de Usuario</button>
-                            <button className="change-button">Cambiar Contraseña</button>
-                        </div>
-                    </div>
-                    <div className="account-data">
-                        <h3>Datos personales</h3>
-                        <form onSubmit={handleSubmit}>
-                            <input
-                                type="text"
-                                name="nombreCompleto"
-                                placeholder="Nombre Completo"
-                                className="edit-input"
-                                value={formData.nombreCompleto}
-                                onChange={handleChange}
-                            />
+            <div className="edit-account-content">
+                <h2>Editar Cuenta</h2>
+                <form onSubmit={handleSubmit} className="edit-account-form">
+                    <label>Nombre Completo</label>
+                    <input
+                        type="text"
+                        name="nombreCompleto"
+                        value={formData.nombreCompleto}
+                        onChange={handleChange}
+                        required
+                    />
 
-                            <input
-                                type="text"
-                                name="fechaNacimiento"
-                                placeholder="Fecha de Nacimiento"
-                                className="edit-input"
-                                value={formData.fechaNacimiento}
-                                onChange={handleChange}
-                            />
+                    <label>Fecha de Nacimiento</label>
+                    <input
+                        type="date"
+                        name="fechaNacimiento"
+                        value={formData.fechaNacimiento}
+                        onChange={handleChange}
+                        required
+                    />
 
-                            <input
-                                type="text"
-                                name="nacionalidad"
-                                placeholder="Nacionalidad"
-                                className="edit-input"
-                                value={formData.nacionalidad}
-                                onChange={handleChange}
-                            />
+                    <label>Nacionalidad</label>
+                    <input
+                        type="text"
+                        name="nacionalidad"
+                        value={formData.nacionalidad}
+                        onChange={handleChange}
+                        required
+                    />
 
-                            <input
-                                type="text"
-                                name="ocupacion"
-                                placeholder="Ocupación o Profesión"
-                                className="edit-input"
-                                value={formData.ocupacion}
-                                onChange={handleChange}
-                            />
+                    <label>Ocupación o Profesión</label>
+                    <input
+                        type="text"
+                        name="ocupacion"
+                        value={formData.ocupacion}
+                        onChange={handleChange}
+                        required
+                    />
 
-                            <select
-                                name="sexo"
-                                className="edit-input"
-                                value={formData.sexo}
-                                onChange={handleChange}
-                            >
-                                <option value="Mujer">Mujer</option>
-                                <option value="Hombre">Hombre</option>
-                            </select>
+                    <label>Sexo</label>
+                    <select
+                        name="sexo"
+                        value={formData.sexo}
+                        onChange={handleChange}
+                        required
+                    >
+                        <option value="Mujer">Mujer</option>
+                        <option value="Hombre">Hombre</option>
+                    </select>
 
-                            <select
-                                name="estadoCivil"
-                                className="edit-input"
-                                value={formData.estadoCivil}
-                                onChange={handleChange}
-                            >
-                                <option value="Soltero">Soltero</option>
-                                <option value="Casado">Casado</option>
-                            </select>
+                    <label>Estado Civil</label>
+                    <select
+                        name="estadoCivil"
+                        value={formData.estadoCivil}
+                        onChange={handleChange}
+                        required
+                    >
+                        <option value="Soltero">Soltero</option>
+                        <option value="Casado">Casado</option>
+                    </select>
 
-                            <input
-                                type="text"
-                                name="domicilio"
-                                placeholder="Domicilio completo"
-                                className="edit-input"
-                                value={formData.domicilio}
-                                onChange={handleChange}
-                            />
+                    <label>Domicilio Completo</label>
+                    <input
+                        type="text"
+                        name="domicilio"
+                        value={formData.domicilio}
+                        onChange={handleChange}
+                        required
+                    />
 
-                            <input
-                                type="text"
-                                name="giro"
-                                placeholder="Giro, actividad u objeto social"
-                                className="edit-input"
-                                value={formData.giro}
-                                onChange={handleChange}
-                            />
+                    <label>Correo Electrónico</label>
+                    <input
+                        type="email"
+                        name="correoElectronico"
+                        value={formData.correoElectronico}
+                        onChange={handleChange}
+                        required
+                    />
 
-                            <select
-                                name="habitosToxicos"
-                                className="edit-input"
-                                value={formData.habitosToxicos}
-                                onChange={handleChange}
-                            >
-                                <option value="No">No</option>
-                                <option value="Sí">Sí</option>
-                            </select>
+                    <label>Giro</label>
+                    <input
+                        type="text"
+                        name="giro"
+                        value={formData.giro}
+                        onChange={handleChange}
+                        required
+                    />
 
-                            <input
-                                type="text"
-                                name="entidadFederativa"
-                                placeholder="Entidad federativa de nacimiento"
-                                className="edit-input"
-                                value={formData.entidadFederativa}
-                                onChange={handleChange}
-                            />
+                    <label>Especifique brevemente el tipo de actividad</label>
+                    <input
+                        type="text"
+                        name="tipoActividad"
+                        value={formData.tipoActividad}
+                        onChange={handleChange}
+                        required
+                    />
 
-                            <input
-                                type="text"
-                                name="ingresosAnuales"
-                                placeholder="Ingresos Anuales"
-                                className="edit-input"
-                                value={formData.ingresosAnuales}
-                                onChange={handleChange}
-                            />
+                    <label>Entidad Federativa de Nacimiento</label>
+                    <input
+                        type="text"
+                        name="entidadFederativa"
+                        value={formData.entidadFederativa}
+                        onChange={handleChange}
+                        required
+                    />
 
-                            <button type="submit" className="edit-button">Editar</button>
-                        </form>
-                    </div>
-                </div>
+                    <label>Ingresos Anuales</label>
+                    <input
+                        type="number"
+                        name="ingresosAnuales"
+                        value={formData.ingresosAnuales}
+                        onChange={handleChange}
+                        required
+                    />
+
+                    <label>Origen del Patrimonio</label>
+                    <input
+                        type="text"
+                        name="origenPatrimonio"
+                        value={formData.origenPatrimonio}
+                        onChange={handleChange}
+                        required
+                    />
+
+                    <label>Hábitos Toxicológicos</label>
+                    <select
+                        name="habitosToxicos"
+                        value={formData.habitosToxicos}
+                        onChange={handleChange}
+                        required
+                    >
+                        <option value="si">Sí</option>
+                        <option value="no">No</option>
+                    </select>
+
+                    <label>Descripción de los Hábitos Toxicológicos</label>
+                    <textarea
+                        name="descripcionHabitos"
+                        value={formData.descripcionHabitos}
+                        onChange={handleChange}
+                    ></textarea>
+
+                    <label>Contraseña</label>
+                    <input
+                        type="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        required
+                    />
+
+                    <button type="submit">Guardar Cambios</button>
+                </form>
             </div>
             <Footer />
         </div>

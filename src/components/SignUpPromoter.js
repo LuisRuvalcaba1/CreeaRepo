@@ -131,14 +131,19 @@ const SignUpPromoter = () => {
                         />
                         {errors.nombrePromotoria && <div className="error">{errors.nombrePromotoria}</div>}
 
-                        <input
-                            type="text"
+                        <select
                             name="zona"
-                            placeholder="Zona"
-                            className="signup-promoter-input"
                             value={formData.zona}
                             onChange={handleChange}
-                        />
+                            className="signup-promoter-input"
+                        >
+                            <option value="">Selecciona una Zona</option>
+                            <option value="Direccion Occidente Pacifico">Dirección Occidente Pacifico</option>
+                            <option value="Direccion Norte">Direccion Norte</option>
+                            <option value="Dirección Peninsula">Dirección Peninsula</option>
+                            <option value="Dirección Centro">Dirección Centro</option>
+                            <option value="Direccion Sur">Direccion Sur</option>
+                        </select>
                         {errors.zona && <div className="error">{errors.zona}</div>}
 
                         <input

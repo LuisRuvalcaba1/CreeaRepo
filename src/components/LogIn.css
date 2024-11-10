@@ -106,3 +106,8 @@
 .register-link:hover {
     color: var(--color-azul-tiffany);
 }
+
+.error-message {
+    color: rgb(255, 255, 255);
+    margin-top: 10px;
+}

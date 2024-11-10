@@ -117,29 +117,6 @@ header nav ul li a:hover {
   color: var(--color-azul-tiffany);
 }
 
-/* Estilo para el footer */
-footer {
-  background-color: var(--color-azul-navy);
-  padding: 20px;
-  text-align: center;
-  color: var(--color-blanco);
-  position: relative;
-  bottom: 0;
-  width: 100%;
-  font-family: 'Roboto', sans-serif; /* Aplicar Roboto al footer */
-}
-
-footer p {
-  margin: 5px 0;
-}
-
-footer a {
-  color: var(--color-blanco);
-}
-
-footer a:hover {
-  color: var(--color-azul-tiffany);
-}
 
 /* Estilos específicos para secciones y componentes */
 .home-page,
@@ -168,4 +145,16 @@ footer a:hover {
   display: flex;
   justify-content: center;
   gap: 20px;
+}
+
+canvas {
+  display: block;
+  margin: 0 auto;
+  border: 2px solid #337BC2;
+  background-color: white;
+  width: 100vw; /* O usa una proporción adecuada */
+  height: 80vh;
+  box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.1);
+  margin-top: 20px;
+  border-radius: 8px;
 }

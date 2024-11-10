@@ -1,0 +1,39 @@
+.summary-container {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.summary-title {
+  font-family: 'Orbitron', sans-serif;
+  color: var(--color-blanco);
+  font-size: 1.5em;
+  margin-bottom: 10px;
+}
+
+.summary-text {
+  font-family: 'Roboto', sans-serif;
+  color: var(--color-blanco);
+  font-size: 1em;
+  margin-bottom: 20px;
+}
+
+.start-button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 5px;
+  background-color: var(--color-amarillo-canario);
+  color: #fff;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.start-button:hover {
+  background-color: #337BC2;
+}

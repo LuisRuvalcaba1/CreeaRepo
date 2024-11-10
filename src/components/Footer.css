@@ -1,12 +1,15 @@
-/* src/components/Footer.css */
+/* Estilo del Footer con Glassmorphism */
 .app-footer {
-    background-color: #01274D; /* Azul Navy */
-    color: #FFFFFF; /* Blanco */
+    background: rgba(255, 255, 255, 0.1); /* Fondo translúcido para efecto glassmorphism */
+    backdrop-filter: blur(10px); /* Desenfoque */
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); /* Sombra sutil */
+    color: #FFFFFF; /* Color del texto */
     text-align: center;
     padding: 30px 20px;
     width: 100%;
     position: relative;
     bottom: 0;
+    left: 0;
 }
 
 .footer-content {
@@ -31,3 +34,22 @@
     color: #FFFFFF; /* Blanco */
 }
 
+/* Asegurar que el contenido empuje el footer hacia abajo */
+html, body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+.App {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* Asegura que todo ocupe la altura de la ventana */
+}
+
+.main-content {
+    flex: 1; /* Empuja el footer hacia abajo */
+}
