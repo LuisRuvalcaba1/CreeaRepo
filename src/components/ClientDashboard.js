@@ -18,6 +18,20 @@ const ClientDashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+  const userId = sessionStorage.getItem('userId');
+  axios.get(`/api/calendar/events?userId=${userId}`)
+    .then((response) => {
+      setEvents(response.data.map(event => ({
+        id: event.id,
+        title: event.title,
+        start: new Date(event.start_datetime),
+        end: new Date(event.end_datetime),
+        link: event.meet_link || '',
+      })));
+    })
+    .catch((error) => {
+      console.error('Error al cargar eventos:', error);
+    });
     // Datos simulados de seguros, pagos y renovación
     setInsuranceInfo([{ policy: 'Orvi 99', details: 'Cubre fallecimiento y accidentes.' }]);
     setNextRenewal('2025-01-15');
@@ -31,34 +45,33 @@ const ClientDashboard = () => {
 
     // Inicializamos algunos eventos
     setEvents([
-      { id: 1, title: 'Reunión con asesor', date: '2024-09-10', time: '10:00', link: 'https://meet.google.com' },
-      { id: 2, title: 'Renovación de seguro', date: '2024-10-05', time: '14:00', link: '' }
+      { id: 1, title: 'Reunión con asesor', start: new Date('2024-09-10T10:00'), end: new Date('2024-09-10T11:00'), link: 'https://meet.google.com' },
+      { id: 2, title: 'Renovación de seguro', start: new Date('2024-10-05T14:00'), end: new Date('2024-10-05T15:00'), link: '' }
     ]);
   }, []);
 
   // Validación de conflictos de eventos
   const validateEventConflict = (newEvent) => {
-    return events.some(event => event.date === newEvent.date && event.time === newEvent.time);
+    return events.some(event => event.start.toISOString() === newEvent.start.toISOString());
   };
 
   // Función para guardar un nuevo evento
   const handleSaveEvent = (eventData) => {
-    if (validateEventConflict(eventData)) {
+    const newEvent = {
+      id: events.length + 1,
+      title: eventData.title,
+      start: eventData.start,
+      end: eventData.end,
+      link: eventData.link,
+    };
+
+    if (validateEventConflict(newEvent)) {
       setConflictError('Ya tienes un evento programado para esa fecha y hora.');
       return;
     }
 
-    const newEvent = {
-      id: events.length + 1,
-      title: eventData.title,
-      start: new Date(`${eventData.date}T${eventData.time}`),
-      end: new Date(`${eventData.date}T${eventData.time}`),
-      link: eventData.link,
-    };
-
     setEvents([...events, newEvent]);
     setShowConfirmation(true);
-    alert('Evento agregado exitosamente.');
   };
 
   const handleEditEvent = (updatedEvent) => {
@@ -66,13 +79,11 @@ const ClientDashboard = () => {
       prevEvents.map((event) => event.id === updatedEvent.id ? updatedEvent : event)
     );
     setShowConfirmation(true);
-    alert('Evento editado exitosamente.');
   };
 
   const handleDeleteEvent = (eventToDelete) => {
     setEvents((prevEvents) => prevEvents.filter((event) => event.id !== eventToDelete.id));
     setShowConfirmation(true);
-    alert('Evento eliminado exitosamente.');
   };
 
   // Función para manejar el clic en un pago pendiente

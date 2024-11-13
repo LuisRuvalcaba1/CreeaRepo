@@ -10,23 +10,22 @@ const localizer = momentLocalizer(moment);
 const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete }) => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventForm, setShowEventForm] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(null);  // Estado para la fecha seleccionada
+  const [selectedDate, setSelectedDate] = useState(null);
 
   // Cuando se selecciona un espacio en el calendario
   const handleSelectSlot = ({ start }) => {
-    setSelectedDate(start);  // Capturamos la fecha seleccionada
-    setSelectedEvent(null);  // Si se trata de un nuevo evento
-    setShowEventForm(true);  // Abre el modal
+    setSelectedDate(start);
+    setSelectedEvent(null);
+    setShowEventForm(true);
   };
 
   // Cuando se selecciona un evento existente
   const handleSelectEvent = (event) => {
     setSelectedEvent(event);
-    setSelectedDate(event.start);  // Usa la fecha del evento seleccionado
-    setShowEventForm(true);  // Abre el modal para editar
+    setSelectedDate(event.start);
+    setShowEventForm(true);
   };
 
-  // Guardar un nuevo evento o editar uno existente
   const handleSaveEvent = (eventData) => {
     const startDateTime = new Date(selectedDate);
     const [hours, minutes] = eventData.time.split(':');
@@ -34,25 +33,22 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete }) => {
     startDateTime.setMinutes(minutes);
 
     const newEvent = {
-      id: selectedEvent ? selectedEvent.id : events.length + 1,  // Generar un id único si es nuevo
+      id: selectedEvent ? selectedEvent.id : events.length + 1,
       title: eventData.title,
-      start: startDateTime,  // Fecha de inicio
-      end: new Date(startDateTime.getTime() + 60 * 60 * 1000),  // Añadimos una hora al tiempo de finalización
-      link: eventData.link,  // Enlace si es un evento de Google Meet
+      start: startDateTime,
+      end: new Date(startDateTime.getTime() + 60 * 60 * 1000),
+      link: eventData.link,
     };
 
     if (selectedEvent) {
-      // Editar un evento existente
       onEventEdit({ ...selectedEvent, ...newEvent });
     } else {
-      // Crear un nuevo evento
       onEventAdd(newEvent);
     }
-    
+
     setShowEventForm(false);
   };
 
-  // Eliminar un evento
   const handleDeleteEvent = () => {
     if (selectedEvent) {
       onEventDelete(selectedEvent);
@@ -80,7 +76,7 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete }) => {
           onSave={handleSaveEvent}
           initialData={selectedEvent}
           onDelete={handleDeleteEvent}
-          selectedDate={selectedDate}  // Pasamos la fecha seleccionada al modal
+          selectedDate={selectedDate}
         />
       )}
     </div>

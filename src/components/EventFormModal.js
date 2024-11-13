@@ -4,67 +4,107 @@ import './EventFormModal.css';
 const EventFormModal = ({ show, onClose, onSave, initialData = {}, onDelete, selectedDate }) => {
   const [title, setTitle] = useState(initialData?.title || '');
   const [time, setTime] = useState('');
-  const [clientEmail, setClientEmail] = useState('');
-  const [advisorEmail, setAdvisorEmail] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [eventType, setEventType] = useState('meeting');
+  const [link, setLink] = useState(initialData?.link || '');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (selectedDate) {
-      // Inicializa la hora si es necesario
       const selectedTime = selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setTime(selectedTime);
+      setEndTime(selectedTime); // Inicializar hora de término igual a la de inicio
     }
-  }, [selectedDate]);
+    if (initialData?.time) setTime(initialData.time);
+    if (initialData?.endTime) setEndTime(initialData.endTime);
+    if (initialData?.link) setLink(initialData.link);
+  }, [selectedDate, initialData]);
 
   const handleSave = async () => {
+    // Limpiar errores previos
+    setError('');
+
+    const userId = sessionStorage.getItem('userId'); // Obtener userId del sessionStorage
+    const clientId = sessionStorage.getItem('clientId'); // Obtener clientId del sessionStorage
+
+    if (!userId) {
+      setError('No se encontró el userId. Por favor, inicia sesión nuevamente.');
+      return;
+    }
+
+    if (!title) {
+      setError('El título es obligatorio.');
+      return;
+    }
+
     if (!time || !time.includes(':')) {
-      alert('Por favor, introduce una hora válida.');
+      setError('Por favor, introduce una hora de inicio válida.');
       return;
     }
 
-    // Asegúrate de que la hora esté en formato "HH:MM"
-    const [hours, minutes] = time.split(':');
-
-    if (!hours || !minutes) {
-      alert('Hora inválida. Por favor, introduce una hora válida.');
+    if (!endTime || !endTime.includes(':')) {
+      setError('Por favor, introduce una hora de término válida.');
       return;
     }
 
-    // Crea un nuevo objeto Date combinando la fecha y la hora
+    const [startHours, startMinutes] = time.split(':');
+    const [endHours, endMinutes] = endTime.split(':');
+
     const formattedStartDateTime = new Date(selectedDate);
-    formattedStartDateTime.setHours(hours);
-    formattedStartDateTime.setMinutes(minutes);
+    formattedStartDateTime.setHours(startHours);
+    formattedStartDateTime.setMinutes(startMinutes);
 
-    if (isNaN(formattedStartDateTime.getTime())) {
-      alert('Fecha u hora inválida.');
+    const formattedEndDateTime = new Date(selectedDate);
+    formattedEndDateTime.setHours(endHours);
+    formattedEndDateTime.setMinutes(endMinutes);
+
+    if (isNaN(formattedStartDateTime.getTime()) || isNaN(formattedEndDateTime.getTime())) {
+      setError('Fecha u hora inválida.');
       return;
     }
 
-    // Establece la duración del evento (ej. 1 hora)
-    const endDateTime = new Date(formattedStartDateTime.getTime() + 60 * 60 * 1000);
+    if (formattedStartDateTime >= formattedEndDateTime) {
+      setError('La hora de término debe ser posterior a la hora de inicio.');
+      return;
+    }
 
     const eventData = {
       title,
-      startDateTime: formattedStartDateTime.toISOString(), // Formato ISO válido
-      endDateTime: endDateTime.toISOString(),
-      clientEmail: eventType === 'meeting' ? clientEmail : '',
-      advisorEmail: eventType === 'meeting' ? advisorEmail : '',
+      time,
+      startDateTime: formattedStartDateTime.toISOString(),
+      endDateTime: formattedEndDateTime.toISOString(),
       eventType,
+      createdBy: userId,
+      clientId: clientId || null,
+      attendees: [],
     };
 
-    const response = await fetch('/api/calendar/save-event', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(eventData),
-    });
+    try {
+      const response = await fetch('/api/calendar/create-event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventData),
+      });
 
-    const result = await response.json();
-    if (response.ok) {
-      onSave({ ...eventData, link: result.meetingLink || '' });
-    } else {
-      alert('Error al crear el evento: ' + result.error);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText);
+      }
+
+      const result = await response.json();
+      onSave({
+        title,
+        time,
+        start: formattedStartDateTime,
+        end: formattedEndDateTime,
+        link: result.meetingLink || '', // Incluye el enlace del Meet si existe
+      });
+      setLink(result.meetingLink || '');
+    } catch (error) {
+      console.error('Error al crear el evento:', error);
+      setError(`Error al crear el evento: ${error.message}`);
     }
 
     onClose();
@@ -85,26 +125,14 @@ const EventFormModal = ({ show, onClose, onSave, initialData = {}, onDelete, sel
             type="time"
             value={time}
             onChange={(e) => setTime(e.target.value)}
+            placeholder="Hora de Inicio"
           />
-
-          {/* Mostrar los campos de correo solo si es un evento de Google Meet */}
-          {eventType === 'meeting' && (
-            <>
-              <input
-                type="email"
-                placeholder="Correo del Cliente"
-                value={clientEmail}
-                onChange={(e) => setClientEmail(e.target.value)}
-              />
-              <input
-                type="email"
-                placeholder="Correo del Asesor"
-                value={advisorEmail}
-                onChange={(e) => setAdvisorEmail(e.target.value)}
-              />
-            </>
-          )}
-
+          <input
+            type="time"
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+            placeholder="Hora de Término"
+          />
           <label>
             <input
               type="radio"
@@ -123,12 +151,23 @@ const EventFormModal = ({ show, onClose, onSave, initialData = {}, onDelete, sel
             />
             Crear solo un evento
           </label>
-
+          {link && (
+            <div className="meet-link">
+              <a href={link} target="_blank" rel="noopener noreferrer">
+                Ir a la videollamada de Google Meet
+              </a>
+            </div>
+          )}
+          {error && <p style={{ color: 'red' }}>{error}</p>}
           <button onClick={handleSave}>Guardar</button>
           {initialData && initialData.id && (
-            <button onClick={onDelete} className="delete-btn">Eliminar</button>
+            <button onClick={onDelete} className="delete-btn">
+              Eliminar
+            </button>
           )}
-          <button onClick={onClose} className="cancel-btn">Cancelar</button>
+          <button onClick={onClose} className="cancel-btn">
+            Cancelar
+          </button>
         </div>
       </div>
     )

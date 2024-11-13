@@ -1,7 +1,6 @@
 /* Importa la fuente Orbitron desde Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
 
-/* Contenedor principal del calendario */
 .calendar-container {
     background: rgba(255, 255, 255, 0.1); /* Glassmorphism */
     backdrop-filter: blur(10px);
@@ -9,19 +8,22 @@
     border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: 15px;
     padding: 20px;
-    margin: 20px;
+    margin: 0 auto; /* Centra el contenedor horizontalmente */
+    width: 90%; /* Ocupa el 90% del ancho disponible */
+    max-width: 1000px; /* Máximo ancho para evitar desbordamientos */
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
     color: #ffffff;
     font-family: 'Orbitron', sans-serif;
 }
 
-/* Estilos del calendario */
 .rbc-calendar {
     background: transparent;
     color: #ffffff;
     border: none;
     font-family: 'Orbitron', sans-serif;
+    width: 100%; /* Asegura que el calendario ocupe el ancho completo del contenedor */
 }
+
 
 /* Toolbar (barra de herramientas del calendario) */
 .rbc-toolbar {

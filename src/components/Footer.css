@@ -1,55 +1,46 @@
 /* Estilo del Footer con Glassmorphism */
 .app-footer {
-    background: rgba(255, 255, 255, 0.1); /* Fondo translúcido para efecto glassmorphism */
+    background: rgba(255, 255, 255, 0.1); /* Fondo translúcido */
     backdrop-filter: blur(10px); /* Desenfoque */
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); /* Sombra sutil */
-    color: #FFFFFF; /* Color del texto */
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); /* Sombra */
+    color: #FFFFFF;
     text-align: center;
-    padding: 30px 20px;
-    width: 100%;
+    padding: 20px;
     position: relative;
     bottom: 0;
     left: 0;
+    width: 100%;
 }
 
-.footer-content {
-    max-width: 1200px;
-    margin: 0 auto;
+.footer-icons {
+    display: flex;
+    justify-content: center;
+    gap: 20px; /* Espaciado entre íconos */
+    margin-bottom: 10px;
 }
 
-.app-footer p {
-    margin: 10px 0;
-    font-size: 16px;
-}
-
-.app-footer a {
+.footer-icons a {
     color: #29CFC5; /* Azul Tiffany */
-    text-decoration: none;
-    margin: 0 10px;
-    font-size: 16px;
-    transition: color 0.3s ease;
+    transition: transform 0.3s ease, color 0.3s ease;
 }
 
-.app-footer a:hover {
+.footer-icons a:hover {
     color: #FFFFFF; /* Blanco */
+    transform: scale(1.2); /* Aumenta ligeramente el tamaño */
 }
 
-/* Asegurar que el contenido empuje el footer hacia abajo */
-html, body {
-    height: 100%;
+.footer-bottom {
+    font-size: 14px;
+    margin-top: 10px;
 }
 
-body {
-    display: flex;
-    flex-direction: column;
-}
+/* Estilo responsivo */
+@media (max-width: 768px) {
+    .footer-icons {
+        gap: 15px; /* Reducir espacio entre íconos */
+    }
 
-.App {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh; /* Asegura que todo ocupe la altura de la ventana */
-}
-
-.main-content {
-    flex: 1; /* Empuja el footer hacia abajo */
+    .footer-bottom {
+        font-size: 12px;
+    }
 }

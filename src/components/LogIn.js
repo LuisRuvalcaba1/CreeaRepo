@@ -27,12 +27,16 @@ const LogIn = () => {
                 if (data.success) {
                     // Guardar userId y userType en sessionStorage
                     sessionStorage.setItem('userId', data.userId); 
-                    sessionStorage.setItem('userType', userType); // Guardar el tipo de usuario
+                    sessionStorage.setItem('userType', userType);
+                    sessionStorage.setItem('email', username);
 
-                    // Redirigir según el tipo de usuario
+                    // Guardar clientId si el usuario es de tipo cliente
                     if (userType === 'cliente') {
+                        sessionStorage.setItem('clientId', data.clientId);
+                        sessionStorage.setItem('clientEmail', username);
                         navigate('/client-home');
                     } else if (userType === 'asesor') {
+                        sessionStorage.setItem('advisorEmail', username);
                         navigate('/advisor-home');
                     } else if (userType === 'promotor/administrador') {
                         navigate('/promoter-home');

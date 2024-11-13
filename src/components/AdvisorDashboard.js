@@ -12,10 +12,10 @@ const AdvisorDashboard = () => {
   const [searchTerm, setSearchTerm] = useState(''); 
   const [expandedClient, setExpandedClient] = useState(null);
   const [events, setEvents] = useState([]);
-  const [exchangeRates, setExchangeRates] = useState({});
   const [visibleClients, setVisibleClients] = useState(5); 
   const [filter, setFilter] = useState({ status: '', occupation: '', gender: '' });
   const [note, setNote] = useState('');
+  const [exchangeRates] = useState({ usd: 20.50, udi: 6.50 });
   const navigate = useNavigate();
   const advisorId = sessionStorage.getItem('userId'); 
 
@@ -29,10 +29,25 @@ const AdvisorDashboard = () => {
         console.error('Error al obtener clientes:', error);
       }
     };
+
+    const fetchEvents = async () => {
+      try {
+        const response = await axios.get(`/api/get-events?advisorId=${advisorId}`);
+        setEvents(response.data.map(event => ({
+          id: event.id,
+          title: event.title,
+          start: new Date(event.start),
+          end: new Date(event.end)
+        })));
+      } catch (error) {
+        console.error('Error al obtener eventos:', error);
+      }
+    };
+
     fetchClients();
+    fetchEvents();
   }, [advisorId]);
 
-  // Búsqueda y filtrado de clientes (RQF11 y RQNF29)
   useEffect(() => {
     const filtered = clients.filter((client) =>
       client.nombre_completo.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -62,27 +77,6 @@ const AdvisorDashboard = () => {
     setFilter((prevFilter) => ({ ...prevFilter, [name]: value }));
   };
 
-  // Programar reuniones (RQF12 y RQNF31)
-  const handleProgramMeeting = async (clientId) => {
-    const meetingDate = prompt("Ingrese la fecha y hora de la reunión (YYYY-MM-DD HH:MM):");
-    if (meetingDate) {
-      const existingEvent = events.find(event => event.start.toISOString().startsWith(meetingDate));
-      if (existingEvent) {
-        alert('La fecha seleccionada ya tiene una reunión programada.');
-      } else {
-        alert(`Reunión programada con el cliente ID: ${clientId} en ${meetingDate}`);
-        const newEvent = {
-          id: events.length + 1,
-          title: `Reunión con Cliente ${clientId}`,
-          start: new Date(`${meetingDate}`),
-          end: new Date(`${meetingDate}`),
-        };
-        setEvents([...events, newEvent]);
-      }
-    }
-  };
-
-  // Registrar notas (RQF12, RQNF32)
   const handleRegisterNote = async (clientId) => {
     if (note.length > 255) {
       alert('La nota no puede exceder los 255 caracteres.');
@@ -102,26 +96,6 @@ const AdvisorDashboard = () => {
     }
   };
 
-  // Enviar correos (RQF12, RQNF30, RQNF34)
-  const handleSendEmail = async (clientEmail) => {
-    if (!clients.some((client) => client.correo_electronico === clientEmail)) {
-      alert("El correo no está registrado en la base de datos.");
-    } else if (window.confirm(`¿Desea enviar un correo a ${clientEmail}?`)) {
-      try {
-        await axios.post('/api/send-email', {
-          email: clientEmail,
-          subject: 'Asunto del Correo Deseado',
-          message: 'Mensaje personalizado que deseas enviar al cliente'
-        });
-        alert(`Correo enviado a ${clientEmail}`);
-      } catch (error) {
-        console.error('Error al enviar el correo:', error);
-        alert('Error al enviar el correo');
-      }
-    }
-  };
-
-  // Cargar más clientes
   const showMoreClients = () => {
     setVisibleClients(visibleClients + 5); 
   };
@@ -155,8 +129,8 @@ const AdvisorDashboard = () => {
               </select>
               <select name="gender" onChange={handleFilterChange} className="filter-dropdown">
                 <option value="">Sexo</option>
-                <option value="masculino">Masculino</option>
-                <option value="femenino">Femenino</option>
+                <option value="mujer">Mujer</option>
+                <option value="hombre">Hombre</option>
               </select>
             </div>
 
@@ -171,12 +145,6 @@ const AdvisorDashboard = () => {
                     <li>Teléfono: {client.telefono}</li>
                     <li>Estado: {client.estado_cuenta}</li>
                     <li>
-                      <button onClick={() => handleSendEmail(client.correo_electronico)}>
-                        Enviar Correo
-                      </button>
-                      <button onClick={() => handleProgramMeeting(client.id_cliente)}>
-                        Programar Reunión
-                      </button>
                       <textarea
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
@@ -201,12 +169,12 @@ const AdvisorDashboard = () => {
           </div>
           <button className="risk-calculator-btn container">Calculadora de Riesgo</button>
           <button className="financial-projection-btn container" onClick={handleNavigateFinancialProjection}>
-              Rendimientos Financieros
-            </button>
+            Rendimientos Financieros
+          </button>
           <button className="payments-btn container">Pagos</button>
           <button className="form-fill-btn container" onClick={handleNavigateFormFill}>
-          Llenado de Solicitud
-        </button>
+            Llenado de Solicitud
+          </button>
         </div>
         <div className="right-section">
           <div className="agenda-section container">
@@ -220,14 +188,8 @@ const AdvisorDashboard = () => {
           </div>
           <div className="exchange-rate-section container">
             <h2>Tipo de Cambio</h2>
-            <p>Dólar: {exchangeRates.usd ? exchangeRates.usd.toFixed(2) : '20.04'} MXN</p>
-            <p>UDI: {exchangeRates.udi} 8.272670 MXN</p>
-          </div>
-          <div className="interactive-board-section container">
-            <h2>Pizarra Interactiva</h2>
-            <button className="open-board-btn" onClick={() => navigate('/pizarra')}>
-              Ir a la Pizarra
-            </button>
+            <p>Dólar: {exchangeRates.usd.toFixed(2)} MXN</p>
+            <p>UDI: {exchangeRates.udi.toFixed(2)} MXN</p>
           </div>
         </div>
       </div>

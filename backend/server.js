@@ -2,16 +2,17 @@
 
 const express = require('express');
 const calendarRoutes = require('./routes/calendarRoutes');
-const { sendCustomEmail,sendVerificationEmail } = require('./sendVerificationEmail');
-//const { sendCustomEmail } = require('./sendEmail');
-const { getConnection } = require('./db'); 
+const { sendCustomEmail, sendVerificationEmail } = require('./sendVerificationEmail');
+const { getConnection } = require('./db');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
-const http = require('http'); // Añadido para Socket.IO
-const socketIo = require('socket.io'); // Añadido para Socket.IO
+const http = require('http');
+const socketIo = require('socket.io');
 const bodyParser = require('body-parser');
 const { chatbotHandler } = require('./controllers/chatbotController.js');
 const paypal = require('@paypal/checkout-server-sdk');
+const { enviarCorreoInvitacion, enviarRecordatorio } = require('./services/emailService');
+const { createEvent, obtenerEventosProximos24Horas } = require('./services/googleCalendarService'); // Corrige importaciones
 require('dotenv').config();
 
 const app = express();
@@ -221,29 +222,30 @@ app.post('/api/register-client', async (req, res) => {
     habitosToxicos,
     especificarHabitos,
     password,
-    idAsesorSeleccionado // Captura el asesor seleccionado del frontend
+    idAsesorSeleccionado
   } = req.body;
 
   try {
     const connection = getConnection();
 
-    // Verificar si el correo electrónico ya está registrado
+    // Encriptar el correo electrónico y la contraseña
+    const hashedEmail = await bcrypt.hash(correo, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Verificar si el correo electrónico ya está registrado usando el correo encriptado
     const [existingUser] = await connection.query(
       'SELECT * FROM usuario WHERE correo_electronico = ?',
-      [correo]
+      [hashedEmail]
     );
 
     if (existingUser.length > 0) {
       return res.status(400).json({ message: 'El correo electrónico ya está registrado.' });
     }
 
-    // Encriptar la contraseña
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Insertar el usuario en la tabla "usuario"
+    // Insertar el usuario en la tabla "usuario" con el correo encriptado
     const [userResult] = await connection.query(
       'INSERT INTO usuario (correo_electronico, password, tipo_usuario) VALUES (?, ?, "cliente")',
-      [correo, hashedPassword]
+      [hashedEmail, hashedPassword]
     );
 
     const userId = userResult.insertId;
@@ -252,7 +254,6 @@ app.post('/api/register-client', async (req, res) => {
     let idAsesorAsignado = idAsesorSeleccionado;
 
     if (!idAsesorSeleccionado) {
-      // Si no se seleccionó asesor, asignar uno aleatoriamente de la tabla de asesores
       const [asesores] = await connection.query('SELECT id_asesor FROM asesor ORDER BY RAND() LIMIT 1');
       if (asesores.length > 0) {
         idAsesorAsignado = asesores[0].id_asesor;
@@ -261,7 +262,7 @@ app.post('/api/register-client', async (req, res) => {
       }
     }
 
-    // Insertar los datos del cliente en la tabla "cliente" incluyendo el id_asesor
+    // Insertar los datos del cliente en la tabla "cliente"
     await connection.query(
       `
       INSERT INTO cliente (
@@ -294,7 +295,7 @@ app.post('/api/register-client', async (req, res) => {
     const verificationCode = generateVerificationCode();
     verificationCodes[correo] = verificationCode;
 
-    await sendVerificationEmail(correo, verificationCode);
+    await sendVerificationEmail(correo, verificationCode); // Usa el correo original aquí para el envío
 
     res.status(201).json({
       message: 'Cliente registrado exitosamente. Se ha enviado un código de verificación a tu correo.',
@@ -304,6 +305,41 @@ app.post('/api/register-client', async (req, res) => {
     res.status(500).json({ message: 'Error en el servidor al registrar el cliente.' });
   }
 });
+
+app.post('/api/update-password', async (req, res) => {
+  const { email, verificationCode, newPassword } = req.body;
+
+  // Verificar que el código de verificación sea correcto
+  if (verificationCodes[email] !== verificationCode) {
+    return res.status(400).json({ message: 'Código de verificación incorrecto.' });
+  }
+
+  try {
+    const connection = getConnection();
+
+    // Encriptar la nueva contraseña
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Actualizar la contraseña en la base de datos
+    const [result] = await connection.query(
+      'UPDATE usuario SET password = ? WHERE correo_electronico = ?',
+      [hashedPassword, email]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado.' });
+    }
+
+    // Eliminar el código de verificación después de su uso
+    delete verificationCodes[email];
+
+    res.status(200).json({ message: 'Contraseña actualizada exitosamente.' });
+  } catch (err) {
+    console.error('Error al actualizar la contraseña:', err);
+    res.status(500).json({ message: 'Error en el servidor al actualizar la contraseña.' });
+  }
+});
+
 
 // Ruta para solicitar la recuperación de la contraseña
 app.post('/api/forgot-password', async (req, res) => {
@@ -360,7 +396,26 @@ app.post('/api/login', async (req, res) => {
       const isMatch = await bcrypt.compare(password, user.password);
 
       if (isMatch) {
-        res.json({ success: true, message: 'Login exitoso', userType, userId: user.id_usuario });
+        const responseData = { 
+          success: true, 
+          message: 'Login exitoso', 
+          userType, 
+          userId: user.id_usuario 
+        };
+
+        // Si el usuario es de tipo "cliente", obtener el clientId correspondiente
+        if (userType === 'cliente') {
+          const [clientResults] = await connection.query(
+            'SELECT id_cliente AS clientId FROM cliente WHERE id_usuario = ?',
+            [user.id_usuario]
+          );
+
+          if (clientResults.length > 0) {
+            responseData.clientId = clientResults[0].clientId;
+          }
+        }
+
+        res.json(responseData);
       } else {
         res.status(401).json({ success: false, message: 'Contraseña incorrecta' });
       }
@@ -605,23 +660,24 @@ app.post('/api/register-advisor', async (req, res) => {
   try {
     const connection = getConnection();
 
-    // Verificar si el correo electrónico ya está registrado
+    // Encriptar el correo y la contraseña
+    const hashedEmail = await bcrypt.hash(correo, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Verificar si el correo electrónico ya está registrado usando el correo encriptado
     const [existingUser] = await connection.query(
       'SELECT * FROM usuario WHERE correo_electronico = ?',
-      [correo]
+      [hashedEmail]
     );
 
     if (existingUser.length > 0) {
       return res.status(400).json({ message: 'El correo electrónico ya está registrado.' });
     }
 
-    // Encriptar la contraseña
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Insertar el usuario en la tabla "usuario"
+    // Insertar el usuario en la tabla "usuario" con el correo encriptado
     const [userResult] = await connection.query(
       'INSERT INTO usuario (correo_electronico, password, tipo_usuario) VALUES (?, ?, "asesor")',
-      [correo, hashedPassword]
+      [hashedEmail, hashedPassword]
     );
 
     const userId = userResult.insertId;
@@ -638,9 +694,9 @@ app.post('/api/register-advisor', async (req, res) => {
 
     // Generar y enviar el código de verificación por correo electrónico
     const verificationCode = generateVerificationCode();
-    verificationCodes[correo] = verificationCode;
+    verificationCodes[correo] = verificationCode; // Usa el correo original aquí
 
-    await sendVerificationEmail(correo, verificationCode);
+    await sendVerificationEmail(correo, verificationCode); // Usa el correo original para enviar el email
 
     res.status(201).json({
       message: 'Asesor registrado exitosamente. Se ha enviado un código de verificación a tu correo.',
@@ -665,23 +721,24 @@ app.post('/api/register-promoter', async (req, res) => {
   try {
     const connection = getConnection();
 
-    // Verificar si el correo electrónico ya está registrado
+    // Encriptar el correo y la contraseña
+    const hashedEmail = await bcrypt.hash(correo, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Verificar si el correo electrónico ya está registrado usando el correo encriptado
     const [existingUser] = await connection.query(
       'SELECT * FROM usuario WHERE correo_electronico = ?',
-      [correo]
+      [hashedEmail]
     );
 
     if (existingUser.length > 0) {
       return res.status(400).json({ message: 'El correo electrónico ya está registrado.' });
     }
 
-    // Encriptar la contraseña
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Insertar el usuario en la tabla "usuario"
+    // Insertar el usuario en la tabla "usuario" con el correo encriptado
     const [userResult] = await connection.query(
       'INSERT INTO usuario (correo_electronico, password, tipo_usuario) VALUES (?, ?, "promotor/administrador")',
-      [correo, hashedPassword]
+      [hashedEmail, hashedPassword]
     );
 
     const userId = userResult.insertId;
@@ -698,9 +755,9 @@ app.post('/api/register-promoter', async (req, res) => {
 
     // Generar y enviar el código de verificación por correo electrónico
     const verificationCode = generateVerificationCode();
-    verificationCodes[correo] = verificationCode;
+    verificationCodes[correo] = verificationCode; // Usa el correo original aquí
 
-    await sendVerificationEmail(correo, verificationCode);
+    await sendVerificationEmail(correo, verificationCode); // Usa el correo original para enviar el email
 
     res.status(201).json({
       message: 'Promotor registrado exitosamente. Se ha enviado un código de verificación a tu correo.',
@@ -922,6 +979,42 @@ app.post('/api/send-email', async (req, res) => {
       res.status(200).json({ message: 'Correo personalizado enviado' });
   } catch (error) {
       res.status(500).json({ message: 'Error al enviar correo personalizado', error });
+  }
+});
+
+// Ruta para crear un evento en Google Calendar y base de datos
+app.post('/api/calendar/create-event', async (req, res) => {
+  const { title, startDateTime, endDateTime, attendees, clientEmail } = req.body;
+  try {
+    const eventData = await createEvent({ title, startDateTime, endDateTime, attendees });
+    await enviarCorreoInvitacion({
+      to: clientEmail,
+      subject: 'Invitación a reunión',
+      text: `Tu cita ha sido programada para el ${startDateTime}.`,
+      link: eventData.meetLink,
+    });
+
+    res.status(200).json({
+      message: 'Evento creado y correo enviado exitosamente',
+      meetingLink: eventData.meetLink,
+    });
+  } catch (error) {
+    console.error('Error al crear el evento:', error);
+    res.status(500).json({ error: 'Error al crear el evento' });
+  }
+});
+
+// Cron job para enviar recordatorios de eventos de las próximas 24 horas
+const cron = require('node-cron');
+cron.schedule('0 0 * * *', async () => {
+  console.log('Ejecutando tarea programada de recordatorios');
+  const eventosProximos = await obtenerEventosProximos24Horas();
+  for (const evento of eventosProximos) {
+    await enviarRecordatorio({
+      to: evento.clientEmail,
+      eventDate: evento.startDateTime,
+      link: evento.meetLink,
+    });
   }
 });
 
