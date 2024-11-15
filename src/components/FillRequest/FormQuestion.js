@@ -30,6 +30,14 @@ const FormQuestion = ({ question, options, type, onAnswer, documentUpload }) => 
     }
   };
 
+  const handleOptionClick = (option) => {
+    setAnswer(option);
+    // Limpia campos dependientes
+    setFile(null);
+    setError('');
+    setSuccessMessage('');
+  };   
+
   const validateAnswer = () => {
     let validation = { isValid: true, errorMessage: '' };
 
@@ -69,15 +77,16 @@ const FormQuestion = ({ question, options, type, onAnswer, documentUpload }) => 
 
       {options ? (
         <div className="options-container">
-          {options.map((option) => (
-            <button
-              key={option}
-              className="option-button"
-              onClick={() => setAnswer(option)}
-            >
-              {option}
-            </button>
-          ))}
+        {options.map((option) => (
+          <button
+            key={option}
+            className={`option-button ${answer === option ? 'active' : ''}`}
+            onClick={() => handleOptionClick(option)}
+          >
+            {option}
+          </button>
+        ))}
+
         </div>
       ) : (
         <div>

@@ -9,30 +9,24 @@ const cron = require('node-cron');
 router.post('/create-event', async (req, res) => {
   const eventDetails = {
     title: req.body.title,
-    description: req.body.description || '', // Descripción personalizada
+    description: req.body.description || '',
     startDateTime: req.body.startDateTime,
     endDateTime: req.body.endDateTime,
     eventType: req.body.eventType,
     createdBy: req.body.createdBy,
     clientId: req.body.clientId,
-    meetLink: null, // Inicializamos vacío
-    googleEventId: null, // Inicializamos vacío
+    meetLink: null,
+    googleEventId: null,
   };
 
-  // Validación de datos básicos
   if (!eventDetails.title || !eventDetails.startDateTime || !eventDetails.endDateTime || !eventDetails.createdBy || !eventDetails.clientId) {
     return res.status(400).json({ error: 'Datos incompletos para crear el evento' });
   }
-
-  // Validación de que startDateTime sea anterior a endDateTime
   if (new Date(eventDetails.startDateTime) >= new Date(eventDetails.endDateTime)) {
-    return res.status(400).json({
-      error: 'La hora de término debe ser posterior a la hora de inicio.',
-    });
-  }
+    return res.status(400).json({ error: 'La hora de término debe ser posterior a la hora de inicio.' });
+  }  
 
   try {
-    // Crear el evento en Google Calendar si es del tipo "meeting"
     if (eventDetails.eventType === 'meeting') {
       const googleEvent = await createGoogleEvent({
         title: eventDetails.title,
@@ -42,15 +36,12 @@ router.post('/create-event', async (req, res) => {
         attendees: req.body.attendees || [],
       });
 
-      // Añadir Meet Link y Google Event ID
       eventDetails.meetLink = googleEvent.meetLink || null;
       eventDetails.googleEventId = googleEvent.googleEventId;
     }
 
-    // Guardar el evento en la base de datos
     const savedEvent = await createEvent(eventDetails);
 
-    // Enviar correo de confirmación si hay asistentes
     if (req.body.attendees && req.body.attendees.length > 0) {
       try {
         await sendConfirmationEmail({
@@ -72,6 +63,26 @@ router.post('/create-event', async (req, res) => {
   } catch (error) {
     console.error('Error al crear el evento:', error);
     res.status(500).json({ error: 'Error al crear el evento', details: error.message });
+  }
+});
+
+// Obtener eventos por asesor
+router.get('/get-events', async (req, res) => {
+  const { advisorId } = req.query;
+
+  if (!advisorId) {
+    return res.status(400).json({ error: 'Falta el parámetro advisorId' });
+  }
+
+  try {
+    const events = await getEventsByUser(advisorId); // Función en eventService para obtener eventos
+    if (!events || events.length === 0) {
+      return res.status(404).json({ message: 'No se encontraron eventos para este asesor.' });
+    }
+    res.status(200).json(events);
+  } catch (error) {
+    console.error('Error al obtener eventos:', error);
+    res.status(500).json({ error: 'Error al obtener eventos.' });
   }
 });
 
@@ -115,7 +126,6 @@ router.put('/update-event/:eventId', async (req, res) => {
     res.status(500).json({ error: 'Error al actualizar el evento.', details: error.message });
   }
 });
-
 // Obtener eventos para un usuario
 router.get('/events', async (req, res) => {
   const { userId } = req.query;
@@ -135,7 +145,6 @@ router.get('/events', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener eventos.' });
   }
 });
-
 // Eliminar un evento y enviar correo de cancelación
 router.delete('/delete-event/:eventId', async (req, res) => {
   const { eventId } = req.params;
@@ -166,7 +175,6 @@ router.delete('/delete-event/:eventId', async (req, res) => {
     res.status(500).json({ error: 'Error al eliminar el evento' });
   }
 });
-
 // Bloquear intervalos de tiempo para un asesor
 router.post('/block-interval', async (req, res) => {
   const { userId, startDateTime, endDateTime } = req.body;
@@ -183,7 +191,6 @@ router.post('/block-interval', async (req, res) => {
     res.status(500).json({ error: 'Error al bloquear intervalo de tiempo.' });
   }
 });
-
 // Programar cron job para recordatorios de cumpleaños
 cron.schedule('0 9 * * *', async () => {
   try {
@@ -204,5 +211,4 @@ cron.schedule('0 9 * * *', async () => {
     console.error('Error al enviar recordatorios de cumpleaños:', error);
   }
 });
-
 module.exports = router;

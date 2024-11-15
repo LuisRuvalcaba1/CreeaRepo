@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
-import { getNextNode, NODES } from '../../utils/constants';
+import { graph, getNextNode } from "../../utils/formGraph";
 import FormQuestion from './FormQuestion';
 import './FormNavigator.css';
 
 const FormNavigator = ({ startNode, onComplete }) => {
   const [currentNodeId, setCurrentNodeId] = useState(startNode);
-  const [currentNode, setCurrentNode] = useState(NODES[startNode]);
+  const [currentNode, setCurrentNode] = useState(graph[startNode]);
 
   const handleAnswer = (answer) => {
     const nextNodeId = getNextNode(currentNodeId, answer);
@@ -14,7 +14,7 @@ const FormNavigator = ({ startNode, onComplete }) => {
       onComplete();
     } else {
       setCurrentNodeId(nextNodeId);
-      setCurrentNode(NODES[nextNodeId]);
+      setCurrentNode(graph[nextNodeId]);
     }
   };
 

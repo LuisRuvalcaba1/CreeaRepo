@@ -18,35 +18,50 @@ const AdvisorDashboard = () => {
   const [exchangeRates] = useState({ usd: 20.50, udi: 6.50 });
   const navigate = useNavigate();
   const advisorId = sessionStorage.getItem('userId'); 
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [notifiedEvents, setNotifiedEvents] = useState([]);
+  const [meetingDetails, setMeetingDetails] = useState({
+    title: '',
+    startDateTime: '',
+    endDateTime: '',
+  });
 
   useEffect(() => {
-    const fetchClients = async () => {
-      try {
-        const response = await axios.get(`/api/get-clients?advisorId=${advisorId}`);
-        setClients(response.data);
-        setFilteredClients(response.data); 
-      } catch (error) {
-        console.error('Error al obtener clientes:', error);
-      }
-    };
-
     const fetchEvents = async () => {
       try {
         const response = await axios.get(`/api/get-events?advisorId=${advisorId}`);
-        setEvents(response.data.map(event => ({
+        const upcomingEvents = response.data.filter((event) => {
+          const eventDate = new Date(event.start);
+          const now = new Date();
+          const oneDayAhead = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Próximas 24 horas
+          return eventDate >= now && eventDate <= oneDayAhead;
+        });
+  
+        // Filtrar eventos ya notificados
+        const newEvents = upcomingEvents.filter(
+          (event) => !notifiedEvents.some((notified) => notified.id === event.id)
+        );
+  
+        if (newEvents.length > 0) {
+          alert(`Tienes ${newEvents.length} eventos programados en las próximas 24 horas.`);
+          setNotifiedEvents([...notifiedEvents, ...newEvents]); // Agregar los nuevos eventos al estado
+        }
+  
+        setEvents(response.data.map((event) => ({
           id: event.id,
           title: event.title,
           start: new Date(event.start),
-          end: new Date(event.end)
+          end: new Date(event.end),
         })));
       } catch (error) {
         console.error('Error al obtener eventos:', error);
       }
     };
-
-    fetchClients();
+  
     fetchEvents();
-  }, [advisorId]);
+  }, [advisorId, notifiedEvents]); // La dependencia incluye `notifiedEvents`
 
   useEffect(() => {
     const filtered = clients.filter((client) =>
@@ -67,6 +82,15 @@ const AdvisorDashboard = () => {
   const handleNavigateFormFill = () => {
     navigate('/fill-request');
   };
+
+  const handleNavigateInteractiveBoard = () => {
+    navigate('/pizarra');
+  };
+
+  const handleNavigateCalculator = () => {
+    navigate('/calculator');
+  };
+
 
   const toggleExpandClient = (id) => {
     setExpandedClient(expandedClient === id ? null : id);
@@ -100,6 +124,75 @@ const AdvisorDashboard = () => {
     setVisibleClients(visibleClients + 5); 
   };
 
+  const handleOpenModal = (event = null) => {
+    if (event) {
+      // Modo edición
+      setEditingEvent(event);
+      setMeetingDetails({
+        title: event.title,
+        startDateTime: event.start.toISOString().slice(0, 16),
+        endDateTime: event.end.toISOString().slice(0, 16),
+      });
+      setSelectedClient(clients.find(client => client.id_cliente === event.clientId) || null);
+    } else {
+      // Modo creación
+      setEditingEvent(null);
+      setMeetingDetails({ title: '', startDateTime: '', endDateTime: '' });
+      setSelectedClient(null);
+    }
+    setIsModalOpen(true);
+  };
+  
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedClient(null);
+    setMeetingDetails({ title: '', startDateTime: '', endDateTime: '' });
+  };
+  
+  const handleScheduleMeeting = async () => {
+    if (!selectedClient || !meetingDetails.title || !meetingDetails.startDateTime || !meetingDetails.endDateTime) {
+      alert('Por favor, complete todos los campos.');
+      return;
+    }
+  
+    try {
+      if (editingEvent) {
+        // Editar evento existente
+        await axios.put(`/api/calendar/update-event/${editingEvent.id}`, {
+          title: meetingDetails.title,
+          startDateTime: meetingDetails.startDateTime,
+          endDateTime: meetingDetails.endDateTime,
+          clientId: selectedClient.id_cliente,
+        });
+        alert('Evento actualizado exitosamente.');
+      } else {
+        // Crear nuevo evento
+        await axios.post('/api/calendar/create-event', {
+          title: meetingDetails.title,
+          startDateTime: meetingDetails.startDateTime,
+          endDateTime: meetingDetails.endDateTime,
+          clientId: selectedClient.id_cliente,
+          createdBy: advisorId,
+        });
+        alert('Reunión programada exitosamente.');
+      }
+  
+      // Recargar eventos después de la operación
+      const response = await axios.get(`/api/get-events?advisorId=${advisorId}`);
+      setEvents(response.data.map(event => ({
+        id: event.id,
+        title: event.title,
+        start: new Date(event.start),
+        end: new Date(event.end),
+      })));
+  
+      handleCloseModal();
+    } catch (error) {
+      console.error('Error al programar la reunión:', error);
+      alert('Error al programar la reunión.');
+    }
+  };
+  
   return (
     <div className="advisor-dashboard">
       <Header />
@@ -142,7 +235,6 @@ const AdvisorDashboard = () => {
                 {expandedClient === client.id_cliente && (
                   <ul className="client-details">
                     <li>Email: {client.correo_electronico}</li>
-                    <li>Teléfono: {client.telefono}</li>
                     <li>Estado: {client.estado_cuenta}</li>
                     <li>
                       <textarea
@@ -167,13 +259,17 @@ const AdvisorDashboard = () => {
               </button>
             )}
           </div>
-          <button className="risk-calculator-btn container">Calculadora de Riesgo</button>
+          <button className="financial-projection-btn container"onClick={handleNavigateCalculator}>
+            Calculadora de Riesgo
+            </button>
           <button className="financial-projection-btn container" onClick={handleNavigateFinancialProjection}>
             Rendimientos Financieros
           </button>
-          <button className="payments-btn container">Pagos</button>
-          <button className="form-fill-btn container" onClick={handleNavigateFormFill}>
+          <button className="financial-projection-btn container" onClick={handleNavigateFormFill}>
             Llenado de Solicitud
+          </button>
+          <button className="financial-projection-btn container" onClick={handleNavigateInteractiveBoard}>
+            Pizarron Interactivo
           </button>
         </div>
         <div className="right-section">
@@ -181,11 +277,61 @@ const AdvisorDashboard = () => {
             <h2>Calendario</h2>
             <EventCalendar
               events={events}
-              onEventAdd={(e) => setEvents([...events, e])}
-              onEventEdit={(e) => setEvents(events.map(ev => ev.id === e.id ? e : ev))}
-              onEventDelete={(e) => setEvents(events.filter(ev => ev.id !== e.id))}
+              onEventAdd={() => handleOpenModal()} // Crear nuevo evento
+              onEventEdit={(event) => handleOpenModal(event)} // Editar evento existente
+              onEventDelete={(event) => setEvents(events.filter(ev => ev.id !== event.id))} // Eliminar evento
             />
           </div>
+
+          {isModalOpen && (
+            <div className="modal">
+              <div className="modal-content">
+                <h2>Agendar Reunión</h2>
+                <label>
+                  Cliente:
+                  <select
+                    onChange={(e) => setSelectedClient(clients.find(client => client.id_cliente === parseInt(e.target.value)))}
+                  >
+                    <option value="">Seleccione un cliente</option>
+                    {clients.map(client => (
+                      <option key={client.id_cliente} value={client.id_cliente}>
+                        {client.nombre_completo}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Título:
+                  <input
+                    type="text"
+                    value={meetingDetails.title}
+                    onChange={(e) => setMeetingDetails({ ...meetingDetails, title: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Fecha y Hora de Inicio:
+                  <input
+                    type="datetime-local"
+                    value={meetingDetails.startDateTime}
+                    onChange={(e) => setMeetingDetails({ ...meetingDetails, startDateTime: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Fecha y Hora de Término:
+                  <input
+                    type="datetime-local"
+                    value={meetingDetails.endDateTime}
+                    onChange={(e) => setMeetingDetails({ ...meetingDetails, endDateTime: e.target.value })}
+                  />
+                </label>
+                <div className="modal-actions">
+                  <button onClick={handleScheduleMeeting}>Agendar</button>
+                  <button onClick={handleCloseModal}>Cancelar</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="exchange-rate-section container">
             <h2>Tipo de Cambio</h2>
             <p>Dólar: {exchangeRates.usd.toFixed(2)} MXN</p>

@@ -949,6 +949,7 @@ app.post('/generar-comprobante', async (req, res) => {
 
 // Usa las rutas de calendario en la ruta `/api/calendar`
 app.use('/api/calendar', calendarRoutes);
+app.use('/api', require('./routes/calendarRoutes'));
     
 // Endpoint para guardar una nota
 app.post('/api/save-note', async (req, res) => {
@@ -982,25 +983,44 @@ app.post('/api/send-email', async (req, res) => {
   }
 });
 
-// Ruta para crear un evento en Google Calendar y base de datos
 app.post('/api/calendar/create-event', async (req, res) => {
-  const { title, startDateTime, endDateTime, attendees, clientEmail } = req.body;
+  const { title, startDateTime, endDateTime, eventType, createdBy, clientId } = req.body;
+
+  // Validar datos obligatorios
+  if (!title) {
+    return res.status(400).json({ error: 'El título es obligatorio.' });
+  }
+  if (!startDateTime || isNaN(new Date(startDateTime).getTime())) {
+    return res.status(400).json({ error: 'La fecha y hora de inicio son inválidas o faltan.' });
+  }
+  if (!endDateTime || isNaN(new Date(endDateTime).getTime())) {
+    return res.status(400).json({ error: 'La fecha y hora de término son inválidas o faltan.' });
+  }
+  if (!eventType) {
+    return res.status(400).json({ error: 'El tipo de evento es obligatorio.' });
+  }
+  if (!createdBy) {
+    return res.status(400).json({ error: 'El creador del evento es obligatorio.' });
+  }
+
   try {
-    const eventData = await createEvent({ title, startDateTime, endDateTime, attendees });
-    await enviarCorreoInvitacion({
-      to: clientEmail,
-      subject: 'Invitación a reunión',
-      text: `Tu cita ha sido programada para el ${startDateTime}.`,
-      link: eventData.meetLink,
+    // Simulación de creación de evento
+    const eventData = await createEvent({
+      title,
+      startDateTime,
+      endDateTime,
+      eventType,
+      createdBy,
+      clientId,
     });
 
     res.status(200).json({
-      message: 'Evento creado y correo enviado exitosamente',
-      meetingLink: eventData.meetLink,
+      message: 'Evento creado exitosamente',
+      meetingLink: eventData.meetLink || null, // Agregar link si es necesario
     });
   } catch (error) {
     console.error('Error al crear el evento:', error);
-    res.status(500).json({ error: 'Error al crear el evento' });
+    res.status(500).json({ error: 'Error interno del servidor al crear el evento.' });
   }
 });
 
@@ -1017,6 +1037,12 @@ cron.schedule('0 0 * * *', async () => {
     });
   }
 });
+
+const notificationRoutes = require('./routes/notificationRoutes'); // Ajusta el path si es necesario
+
+// Usa las rutas para notificaciones en el endpoint `/api/notifications`
+app.use('/api/notifications', notificationRoutes);
+
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
