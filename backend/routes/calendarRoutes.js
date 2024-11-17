@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { createEvent, updateEvent, deleteEvent, getEventsByUser, blockTimeInterval, getUpcomingBirthdays } = require('../services/eventService'); // Servicio para la base de datos
+const { createEvent, updateEvent, deleteEvent, getEventsByUser, getClientsByAdvisor, blockTimeInterval, getUpcomingBirthdays } = require('../services/eventService'); // Servicio para la base de datos
 const { createGoogleEvent, updateGoogleEvent, deleteGoogleEvent } = require('../services/googleCalendarService'); // Servicio para Google Calendar
-const { sendConfirmationEmail, sendCancellationEmail } = require('../services/emailService'); // Servicio de correos
+const { enviarConfirmacionCita, enviarCorreoCancelacion } = require('../services/emailService'); // Servicio de correos
 const cron = require('node-cron');
 
 // Crear un evento y guardar en Google Calendar y en la base de datos
@@ -44,7 +44,7 @@ router.post('/create-event', async (req, res) => {
 
     if (req.body.attendees && req.body.attendees.length > 0) {
       try {
-        await sendConfirmationEmail({
+        await enviarConfirmacionCita({
           to: req.body.attendees[0].email,
           subject: 'Confirmación de Evento',
           text: `Tu evento ha sido programado para el ${eventDetails.startDateTime}. Únete con este enlace: ${eventDetails.meetLink || 'No hay enlace de Meet'}`,
@@ -66,6 +66,25 @@ router.post('/create-event', async (req, res) => {
   }
 });
 
+router.get('/get-clients-asesor', async (req, res) => {
+  const { advisorId } = req.query;
+
+  if (!advisorId) {
+    return res.status(400).json({ error: 'Falta el parámetro advisorId' });
+  }
+
+  try {
+    const clients = await getClientsByAdvisor(advisorId);
+    if (!clients || clients.length === 0) {
+      return res.status(404).json({ message: 'No se encontraron clientes para este asesor.' });
+    }
+    res.status(200).json(clients);
+  } catch (error) {
+    console.error('Error al obtener clientes:', error);
+    res.status(500).json({ error: 'Error al obtener clientes.' });
+  }
+});
+
 // Obtener eventos por asesor
 router.get('/get-events', async (req, res) => {
   const { advisorId } = req.query;
@@ -76,6 +95,44 @@ router.get('/get-events', async (req, res) => {
 
   try {
     const events = await getEventsByUser(advisorId); // Función en eventService para obtener eventos
+    if (!events || events.length === 0) {
+      return res.status(404).json({ message: 'No se encontraron eventos para este asesor.' });
+    }
+    res.status(200).json(events);
+  } catch (error) {
+    console.error('Error al obtener eventos:', error);
+    res.status(500).json({ error: 'Error al obtener eventos.' });
+  }
+});
+
+// router.get('/get-clients-promotor', async (req, res) => {
+//   const { promotorID } = req.query;
+
+//   if (!promotorID) {
+//     return res.status(400).json({ error: 'Falta el parámetro promotorID' });
+//   }
+
+//   try {
+//     const clients = await getClientsByAdvisor(promotorID); // Función en eventService para obtener eventos
+//     if (!clients || clients.length === 0) {
+//       return res.status(404).json({ message: 'No se encontraron clientes para este asesor.' });
+//     }
+//     res.status(200).json(clients);
+//   } catch (error) {
+//     console.error('Error al obtener clientes:', error);
+//     res.status(500).json({ error: 'Error al obtener clientes.' });
+//   }
+// });
+
+router.get('/get-events-promotor', async (req, res) => {
+  const { promotorID } = req.query;
+  console.log(promotorID);
+  if (!promotorID) {
+    return res.status(400).json({ error: 'Falta el parámetro promotorID' });
+  }
+
+  try {
+    const events = await getEventsByUser(promotorID); // Función en eventService para obtener eventos
     if (!events || events.length === 0) {
       return res.status(404).json({ message: 'No se encontraron eventos para este asesor.' });
     }
@@ -159,7 +216,7 @@ router.delete('/delete-event/:eventId', async (req, res) => {
     // Enviar correo de cancelación al cliente
     if (event.clientId && event.clientEmail) { // Asegurar que clientEmail esté definido
       try {
-        await sendCancellationEmail({
+        await enviarCorreoCancelacion({
           to: event.clientEmail, // Correo del cliente asociado
           subject: 'Cancelación de Evento',
           text: `El evento titulado "${event.title}" programado para el ${event.startDateTime} ha sido cancelado.`,
@@ -198,7 +255,7 @@ cron.schedule('0 9 * * *', async () => {
 
     for (const client of upcomingBirthdays) {
       if (client.email && client.name && client.birthdate) { // Validar datos necesarios
-        await sendConfirmationEmail({
+        await enviarConfirmacionCita({
           to: client.email,
           subject: 'Recordatorio de Cumpleaños',
           text: `Recuerda felicitar a ${client.name}, su cumpleaños es el ${client.birthdate}.`,

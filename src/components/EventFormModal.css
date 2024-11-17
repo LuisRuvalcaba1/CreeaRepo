@@ -4,62 +4,179 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.5); /* Fondo oscuro semitransparente */
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  backdrop-filter: blur(5px);
 }
 
 .modal-content {
-  background: rgba(1, 39, 77, 0.8); /* Fondo Azul Navy con transparencia */
-  backdrop-filter: blur(15px); /* Efecto de desenfoque */
+  background: rgba(1, 39, 77, 0.8);
+  backdrop-filter: blur(15px);
   border-radius: 15px;
-  padding: 15px; /* Ajustar el padding para hacer más pequeño el modal */
+  padding: 15px;
   color: #ffffff;
-  width: 300px; /* Ajuste para hacerlo más pequeño */
+  width: 350px;
+  max-height: 80vh; /* Altura máxima del 80% de la ventana */
+  overflow-y: auto; /* Habilitar scroll vertical */
   display: flex;
   flex-direction: column;
-  gap: 10px; /* Ajustar el espaciado */
+  gap: 10px;
   font-family: 'Orbitron', sans-serif;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* Sombra para destacar el modal */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .modal-content h2 {
   margin: 0;
-  color: #29cfc5; /* Azul Tiffany para el título */
+  color: #29cfc5;
+  font-size: 1.2rem;
+  text-align: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(41, 207, 197, 0.3);
+  position: sticky;
+  top: 0;
+  background: rgba(1, 39, 77, 0.95);
+  z-index: 1;
 }
 
-.modal-content input {
-  padding: 8px; /* Ajuste del padding */
-  border: 1px solid #337bc2; /* Borde color Azure */
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.1); /* Fondo semitransparente */
+.form-group {
+  margin-bottom: 10px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 4px;
+  color: #29cfc5;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.form-group input[type="text"],
+.form-group input[type="time"],
+.form-group select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #337bc2;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.85rem;
 }
 
-.modal-content button {
-  padding: 8px; /* Ajustar el tamaño de los botones */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.button-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 15px;
+  position: sticky;
+  bottom: 0;
+  background: rgba(1, 39, 77, 0.95);
+  padding-top: 10px;
+  border-top: 1px solid rgba(41, 207, 197, 0.3);
+}
+
+.button-group button {
+  padding: 8px;
   border: none;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
-  background: #337bc2; /* Fondo color Azure */
-  color: #ffffff;
-  font-size: 14px; /* Reducir ligeramente el tamaño de la fuente */
-  transition: background 0.3s, transform 0.2s; /* Animación suave */
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.85rem;
+  transition: all 0.3s ease;
+  flex: 1;
 }
 
-.modal-content button:hover {
-  background: #29cfc5; /* Cambia a Azul Tiffany al pasar el cursor */
-  transform: translateY(-2px); /* Pequeño efecto de elevación */
+.save-btn {
+  background: #337bc2;
+  color: #ffffff;
+}
+
+.save-btn:hover {
+  background: #29cfc5;
+  transform: translateY(-2px);
+}
+
+.delete-btn {
+  background: #ff4c4c;
+  color: #ffffff;
 }
 
 .cancel-btn {
-  background: #ff4c4c; /* Color rojo para cancelar */
+  background: rgba(255, 76, 76, 0.8);
   color: #ffffff;
 }
 
-.cancel-btn:hover {
-  background: #ff7878; /* Cambia a un tono más claro al pasar el cursor */
+.error-message {
+  color: #ff4c4c;
+  background: rgba(255, 76, 76, 0.1);
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  margin-top: 8px;
 }
-  
+
+/* Personalización del scrollbar */
+.modal-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background: #337bc2;
+  border-radius: 2px;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: #29cfc5;
+}
+
+/* Animación de entrada */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-content {
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+/* Hacer los inputs más compactos en móviles */
+@media (max-width: 480px) {
+  .modal-content {
+    width: 90%;
+    max-height: 85vh;
+    padding: 12px;
+  }
+
+  .form-group {
+    margin-bottom: 8px;
+  }
+
+  .button-group {
+    margin-top: 12px;
+  }
+}

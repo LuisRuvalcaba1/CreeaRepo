@@ -2,7 +2,7 @@
 
 const express = require('express');
 const calendarRoutes = require('./routes/calendarRoutes');
-const { sendCustomEmail, sendVerificationEmail } = require('./sendVerificationEmail');
+const { sendCustomEmail, sendVerificationEmail } = require('./SendVerificationEmail.js');
 const { getConnection } = require('./db');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
