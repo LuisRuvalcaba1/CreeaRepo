@@ -32,6 +32,9 @@ const AdvisorDashboard = () => {
     endDateTime: "",
     eventType: "meeting", // Agregar tipo de evento por defecto
   });
+  const [isDeleting, setIsDeleting] = useState(false);
+
+
 
   const fetchClients = async () => {
     try {
@@ -199,6 +202,41 @@ const AdvisorDashboard = () => {
     setEditingEvent(null);
   };
 
+  const handleEventAdd = async (event) => {
+    try {
+      await fetchEvents(); // Recargar eventos después de añadir uno nuevo
+    } catch (error) {
+      console.error("Error al actualizar eventos:", error);
+      alert("Error al actualizar los eventos");
+    }
+  };
+
+  const handleEventEdit = async (event) => {
+    try {
+      await fetchEvents(); // Recargar eventos después de editar
+    } catch (error) {
+      console.error("Error al actualizar eventos:", error);
+      alert("Error al actualizar los eventos");
+    }
+  };
+
+  const handleEventDelete = async (event) => {
+    if (isDeleting || !event?.id) return;
+    
+    try {
+      setIsDeleting(true);
+      await axios.delete(`/api/calendar/delete-event/${event.id}`);
+      
+      // Actualizar el estado local después de eliminar exitosamente
+      setEvents(prevEvents => prevEvents.filter(e => e.id !== event.id));
+    } catch (error) {
+      console.error('Error al eliminar evento:', error);
+      alert('Error al eliminar el evento');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+  
   const handleScheduleMeeting = async () => {
     if (
       !selectedClient ||
@@ -209,7 +247,7 @@ const AdvisorDashboard = () => {
       alert("Por favor, complete todos los campos.");
       return;
     }
-  
+
     try {
       const eventData = {
         title: meetingDetails.title,
@@ -220,7 +258,7 @@ const AdvisorDashboard = () => {
         createdBy: parseInt(advisorId),
         attendees: [{ email: selectedClient.correo_electronico }],
       };
-  
+
       if (editingEvent) {
         await axios.put(
           `/api/calendar/update-event/${editingEvent.id}`,
@@ -228,16 +266,22 @@ const AdvisorDashboard = () => {
         );
         alert("Evento actualizado exitosamente.");
       } else {
-        const response = await axios.post("/api/calendar/create-event", eventData);
+        const response = await axios.post(
+          "/api/calendar/create-event",
+          eventData
+        );
         console.log("Evento creado:", response.data);
         alert("Reunión programada exitosamente.");
       }
-  
+
       await fetchEvents(); // Recargar eventos
       handleCloseModal();
     } catch (error) {
       console.error("Error al programar la reunión:", error);
-      const errorMessage = error.response?.data?.error || error.response?.data?.details || error.message;
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.details ||
+        error.message;
       alert("Error al programar la reunión: " + errorMessage);
     }
   };
@@ -361,37 +405,30 @@ const AdvisorDashboard = () => {
             <h2>Calendario</h2>
             <EventCalendar
               events={events}
-              onEventAdd={() => handleOpenModal()}
-              onEventEdit={(event) => handleOpenModal(event)}
-              onEventDelete={async (event) => {
-                try {
-                  await axios.delete(`/api/calendar/delete-event/${event.id}`);
-                  await fetchEvents();
-                } catch (error) {
-                  console.error('Error al eliminar evento:', error);
-                  alert('Error al eliminar el evento');
-                }
-              }}
+              onEventAdd={handleEventAdd}
+              onEventEdit={handleEventEdit}
+              onEventDelete={handleEventDelete}
             />
           </div>
 
           {isModalOpen && (
             <div className="modal">
               <div className="modal-content">
-                <h2>{editingEvent ? 'Editar Reunión' : 'Agendar Reunión'}</h2>
+                <h2>{editingEvent ? "Editar Reunión" : "Agendar Reunión"}</h2>
                 <label>
                   Cliente:
                   <select
-                    value={selectedClient?.id_cliente || ''}
+                    value={selectedClient?.id_cliente || ""}
                     onChange={(e) => {
                       const selected = clients.find(
-                        client => client.id_cliente === parseInt(e.target.value)
+                        (client) =>
+                          client.id_cliente === parseInt(e.target.value)
                       );
                       setSelectedClient(selected || null);
                     }}
                   >
                     <option value="">Seleccione un cliente</option>
-                    {clients.map(client => (
+                    {clients.map((client) => (
                       <option key={client.id_cliente} value={client.id_cliente}>
                         {client.nombre_completo}
                       </option>
@@ -403,7 +440,12 @@ const AdvisorDashboard = () => {
                   <input
                     type="text"
                     value={meetingDetails.title}
-                    onChange={(e) => setMeetingDetails({ ...meetingDetails, title: e.target.value })}
+                    onChange={(e) =>
+                      setMeetingDetails({
+                        ...meetingDetails,
+                        title: e.target.value,
+                      })
+                    }
                   />
                 </label>
                 <label>
@@ -411,7 +453,12 @@ const AdvisorDashboard = () => {
                   <input
                     type="datetime-local"
                     value={meetingDetails.startDateTime}
-                    onChange={(e) => setMeetingDetails({ ...meetingDetails, startDateTime: e.target.value })}
+                    onChange={(e) =>
+                      setMeetingDetails({
+                        ...meetingDetails,
+                        startDateTime: e.target.value,
+                      })
+                    }
                   />
                 </label>
                 <label>
@@ -419,12 +466,17 @@ const AdvisorDashboard = () => {
                   <input
                     type="datetime-local"
                     value={meetingDetails.endDateTime}
-                    onChange={(e) => setMeetingDetails({ ...meetingDetails, endDateTime: e.target.value })}
+                    onChange={(e) =>
+                      setMeetingDetails({
+                        ...meetingDetails,
+                        endDateTime: e.target.value,
+                      })
+                    }
                   />
                 </label>
                 <div className="modal-actions">
                   <button onClick={handleScheduleMeeting}>
-                    {editingEvent ? 'Actualizar' : 'Agendar'}
+                    {editingEvent ? "Actualizar" : "Agendar"}
                   </button>
                   <button onClick={handleCloseModal}>Cancelar</button>
                 </div>

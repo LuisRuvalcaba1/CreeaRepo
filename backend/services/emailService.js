@@ -84,28 +84,34 @@ async function enviarRecordatorio({ to, eventDate, eventTime, link }) {
  */
 async function enviarConfirmacionCita({ to, eventDate, eventTime, link }) {
   try {
-    validarParametrosCorreo({ to, eventDate, eventTime, link }, ['to', 'eventDate', 'eventTime', 'link']);
-
     const mailOptions = {
       from: '"CreeaApp" <noreply@creeaapp.com>',
       to,
-      subject: 'Confirmación de tu cita programada',
+      subject: 'Confirmación de cita programada',
       html: `
-        <p>Hola,</p>
-        <p>Tu cita ha sido programada para:</p>
-        <p><strong>Fecha:</strong> ${eventDate}</p>
-        <p><strong>Hora:</strong> ${eventTime}</p>
-        <p>Puedes unirte a la reunión usando el siguiente enlace:</p>
-        <a href="${link}" target="_blank">${link}</a>
-        <p>Gracias,<br>Equipo CreeaApp</p>
-      `,
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2>Confirmación de Cita</h2>
+          <p>Se ha programado una reunión para:</p>
+          <ul>
+            <li><strong>Fecha:</strong> ${eventDate}</li>
+            <li><strong>Hora:</strong> ${eventTime}</li>
+          </ul>
+          ${link ? `
+            <p>Puede unirse a la reunión a través del siguiente enlace:</p>
+            <p><a href="${link}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Unirse a la reunión</a></p>
+          ` : ''}
+          <p>Por favor, agregue este evento a su calendario.</p>
+          <p>Si tiene alguna pregunta o necesita reprogramar, por favor contáctenos.</p>
+          <p>Saludos cordiales,<br>Equipo CreeaApp</p>
+        </div>
+      `
     };
 
     await transporter.sendMail(mailOptions);
-    console.log('Confirmación de cita enviada con éxito a:', to);
+    console.log('Correo de confirmación enviado con éxito a:', to);
     return { success: true };
   } catch (error) {
-    console.error('Error al enviar la confirmación de cita:', error.message);
+    console.error('Error al enviar el correo de confirmación:', error);
     return { success: false, error: error.message };
   }
 }

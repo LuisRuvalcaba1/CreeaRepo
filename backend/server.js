@@ -984,43 +984,35 @@ app.post('/api/send-email', async (req, res) => {
 });
 
 app.post('/api/calendar/create-event', async (req, res) => {
-  const { title, startDateTime, endDateTime, eventType, createdBy, clientId } = req.body;
-
-  // Validar datos obligatorios
-  if (!title) {
-    return res.status(400).json({ error: 'El título es obligatorio.' });
-  }
-  if (!startDateTime || isNaN(new Date(startDateTime).getTime())) {
-    return res.status(400).json({ error: 'La fecha y hora de inicio son inválidas o faltan.' });
-  }
-  if (!endDateTime || isNaN(new Date(endDateTime).getTime())) {
-    return res.status(400).json({ error: 'La fecha y hora de término son inválidas o faltan.' });
-  }
-  if (!eventType) {
-    return res.status(400).json({ error: 'El tipo de evento es obligatorio.' });
-  }
-  if (!createdBy) {
-    return res.status(400).json({ error: 'El creador del evento es obligatorio.' });
-  }
-
+  console.log('Received event data:', req.body);
+  
   try {
-    // Simulación de creación de evento
-    const eventData = await createEvent({
-      title,
-      startDateTime,
-      endDateTime,
-      eventType,
-      createdBy,
-      clientId,
-    });
+    const eventDetails = {
+      title: req.body.title,
+      startDateTime: req.body.startDateTime,
+      endDateTime: req.body.endDateTime,
+      eventType: req.body.eventType,
+      createdBy: req.body.createdBy,
+      clientId: req.body.clientId,
+    };
 
-    res.status(200).json({
+    console.log('Formatted event details:', eventDetails);
+
+    const savedEvent = await createEvent(eventDetails);
+    console.log('Saved event:', savedEvent);
+
+    res.status(201).json({
       message: 'Evento creado exitosamente',
-      meetingLink: eventData.meetLink || null, // Agregar link si es necesario
+      eventData: savedEvent,
+      meetLink: savedEvent.meetLink,
+      googleEventId: savedEvent.googleEventId,
     });
   } catch (error) {
-    console.error('Error al crear el evento:', error);
-    res.status(500).json({ error: 'Error interno del servidor al crear el evento.' });
+    console.error('Error creating event:', error);
+    res.status(500).json({ 
+      error: 'Error al crear el evento', 
+      details: error.message 
+    });
   }
 });
 

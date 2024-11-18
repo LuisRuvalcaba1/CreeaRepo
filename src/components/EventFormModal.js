@@ -1,221 +1,361 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import './EventFormModal.css';
+import React, { useState, useEffect } from "react";
 
-const EventFormModal = ({ show, onClose, onSave, initialData = {}, onDelete, selectedDate }) => {
-  const [title, setTitle] = useState('');
-  const [startDateTime, setStartDateTime] = useState('');
-  const [endDateTime, setEndDateTime] = useState('');
-  const [eventType, setEventType] = useState('meeting');
-  const [link, setLink] = useState('');
-  const [error, setError] = useState('');
-  const [selectedClient, setSelectedClient] = useState(null);
+const EventFormModal = ({
+  show,
+  onClose,
+  onSave,
+  onDelete,
+  initialData = {},
+  selectedDate,
+}) => {
+  const [formData, setFormData] = useState({
+    title: "",
+    startDateTime: "",
+    endDateTime: "",
+    eventType: "meeting",
+    selectedClient: null,
+  });
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (show && selectedDate) {
-      // Crear fecha inicial (hora actual)
       const startDate = new Date(selectedDate);
-      startDate.setMinutes(Math.ceil(startDate.getMinutes() / 15) * 15); // Redondear a los próximos 15 minutos
-      
-      // Crear fecha final (1 hora después)
+      startDate.setMinutes(Math.ceil(startDate.getMinutes() / 15) * 15);
+
       const endDate = new Date(startDate);
       endDate.setHours(endDate.getHours() + 1);
 
-      // Formatear fechas para el input datetime-local
-      setStartDateTime(startDate.toISOString().slice(0, 16));
-      setEndDateTime(endDate.toISOString().slice(0, 16));
-
-      // Cargar clientes
-      const loadClients = async () => {
-        const advisorId = sessionStorage.getItem('userId');
-        try {
-          const response = await axios.get(`/api/calendar/get-clients-asesor?advisorId=${advisorId}`);
-          setClients(response.data);
-        } catch (error) {
-          console.error('Error al cargar clientes:', error);
-          setError('Error al cargar la lista de clientes');
-        }
-      };
+      setFormData((prev) => ({
+        ...prev,
+        startDateTime: formatDateTimeForInput(startDate),
+        endDateTime: formatDateTimeForInput(endDate),
+      }));
 
       loadClients();
     }
   }, [show, selectedDate]);
 
-  // Limpiar el formulario cuando se cierra
   useEffect(() => {
     if (!show) {
-      setTitle('');
-      setStartDateTime('');
-      setEndDateTime('');
-      setEventType('meeting');
-      setLink('');
-      setError('');
-      setSelectedClient(null);
+      setFormData({
+        title: "",
+        startDateTime: "",
+        endDateTime: "",
+        eventType: "meeting",
+        selectedClient: null,
+      });
+      setError("");
+    } else if (initialData?.id) {
+      setFormData({
+        title: initialData.title || "",
+        startDateTime: formatDateTimeForInput(initialData.start) || "",
+        endDateTime: formatDateTimeForInput(initialData.end) || "",
+        eventType: initialData.eventType || "meeting",
+        selectedClient:
+          clients.find((c) => c.id_cliente === initialData.clientId) || null,
+      });
     }
-  }, [show]);
+  }, [show, initialData, clients]);
 
-  const handleSave = async () => {
-    setError('');
-    setLoading(true);
-    const advisorId = sessionStorage.getItem('userId');
+  const formatDateTimeForInput = (date) => {
+    if (!date) return "";
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().slice(0, 16);
+  };
+
+  const formatDateTimeForAPI = (dateString) => {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      throw new Error("Fecha inválida");
+    }
+    return date.toISOString();
+  };
+
+  const loadClients = async () => {
+    const advisorId = sessionStorage.getItem("userId");
+    if (!advisorId) {
+      setError("No se encontró ID del asesor");
+      return;
+    }
 
     try {
-      if (!title.trim()) {
-        throw new Error('El título es obligatorio');
+      const response = await fetch(
+        `/api/calendar/get-clients-asesor?advisorId=${advisorId}`
+      );
+      if (!response.ok) {
+        throw new Error(`Error al cargar clientes: ${response.statusText}`);
       }
+      const data = await response.json();
+      setClients(data);
+    } catch (err) {
+      setError("Error al cargar la lista de clientes");
+      console.error("Error loading clients:", err);
+    }
+  };
 
-      if (!selectedClient) {
-        throw new Error('Por favor, seleccione un cliente');
-      }
+  const validateForm = () => {
+    if (!formData.title.trim()) {
+      throw new Error("El título es obligatorio");
+    }
+    if (!formData.selectedClient) {
+      throw new Error("Por favor, seleccione un cliente");
+    }
+    if (!formData.startDateTime || !formData.endDateTime) {
+      throw new Error("Las fechas de inicio y término son obligatorias");
+    }
 
-      if (!startDateTime || !endDateTime) {
-        throw new Error('Las fechas de inicio y término son obligatorias');
-      }
+    const start = new Date(formData.startDateTime);
+    const end = new Date(formData.endDateTime);
 
-      const start = new Date(startDateTime);
-      const end = new Date(endDateTime);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new Error("Fechas inválidas");
+    }
 
-      if (start >= end) {
-        throw new Error('La hora de término debe ser posterior a la hora de inicio');
+    if (start >= end) {
+      throw new Error(
+        "La hora de término debe ser posterior a la hora de inicio"
+      );
+    }
+  };
+
+  const handleSave = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      validateForm();
+
+      const advisorId = sessionStorage.getItem("userId");
+      if (!advisorId) {
+        throw new Error("No se encontró ID del asesor");
       }
 
       const eventData = {
-        title: title.trim(),
-        startDateTime: start.toISOString(),
-        endDateTime: end.toISOString(),
-        eventType,
+        title: formData.title.trim(),
+        startDateTime: formatDateTimeForAPI(formData.startDateTime),
+        endDateTime: formatDateTimeForAPI(formData.endDateTime),
+        eventType: formData.eventType,
         createdBy: parseInt(advisorId),
-        clientId: parseInt(selectedClient.id_cliente),
-        attendees: [{ email: selectedClient.correo_electronico }]
+        clientId: parseInt(formData.selectedClient.id_cliente),
+        attendees: [{ email: formData.selectedClient.correo_electronico }],
       };
 
-      const response = await axios.post('/api/calendar/create-event', eventData);
-      console.log('Evento creado:', response.data);
+      let response;
+      if (initialData?.id) {
+        // Si hay ID, es una actualización
+        response = await fetch(`/api/calendar/update-event/${initialData.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(eventData),
+        });
+      } else {
+        // Si no hay ID, es una creación
+        response = await fetch("/api/calendar/create-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(eventData),
+        });
+      }
 
-      onSave({
-        title: eventData.title,
-        start,
-        end,
-        clientId: selectedClient.id_cliente,
-        clientName: selectedClient.nombre_completo,
-        meetLink: response.data.eventData.meetLink
-      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al procesar el evento");
+      }
 
+      const responseData = await response.json();
+      onSave(responseData.eventData);
       onClose();
-    } catch (error) {
-      console.error('Error:', error);
-      setError(error.response?.data?.error || error.message);
+    } catch (err) {
+      setError(err.message);
+      console.error("Error:", err);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleDelete = async (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // Agregar esto para evitar propagación del evento
+    if (loading || !initialData?.id) return;
+  
+    if (window.confirm('¿Estás seguro de que deseas eliminar este evento?')) {
+      setLoading(true);
+      try {
+        // En lugar de hacer la llamada fetch aquí, usamos la función proporcionada
+        onDelete(initialData);
+        onClose();
+      } catch (error) {
+        setError('Error al eliminar el evento');
+        console.error('Error:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+  
   if (!show) return null;
 
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        <h2>{initialData?.id ? 'Editar Evento' : 'Nuevo Evento'}</h2>
+        <h2 className="modal-title">
+          {initialData?.id ? "Editar Evento" : "Nuevo Evento"}
+        </h2>
 
-        <div className="form-group">
-          <label>Cliente:</label>
-          <select
-            value={selectedClient?.id_cliente || ''}
-            onChange={(e) => {
-              const client = clients.find(c => c.id_cliente === parseInt(e.target.value));
-              setSelectedClient(client || null);
-            }}
-            disabled={loading}
-            required
-          >
-            <option value="">Seleccione un cliente</option>
-            {clients.map(client => (
-              <option key={client.id_cliente} value={client.id_cliente}>
-                {client.nombre_completo}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>Título:</label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Título del Evento"
-            disabled={loading}
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Fecha y Hora de Inicio:</label>
-          <input
-            type="datetime-local"
-            value={startDateTime}
-            onChange={(e) => setStartDateTime(e.target.value)}
-            disabled={loading}
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Fecha y Hora de Término:</label>
-          <input
-            type="datetime-local"
-            value={endDateTime}
-            onChange={(e) => setEndDateTime(e.target.value)}
-            disabled={loading}
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Tipo de Evento:</label>
-          <div className="radio-group">
-            <label>
-              <input
-                type="radio"
-                value="meeting"
-                checked={eventType === 'meeting'}
-                onChange={() => setEventType('meeting')}
-                disabled={loading}
-              />
-              Crear Evento con Google Meet
+        <div className="form-container">
+          <div className="form-group">
+            <label className="form-label">
+              Cliente: <span className="required">*</span>
             </label>
-            <label>
-              <input
-                type="radio"
-                value="event"
-                checked={eventType === 'event'}
-                onChange={() => setEventType('event')}
-                disabled={loading}
-              />
-              Crear solo un evento
-            </label>
+            <select
+              className="form-select"
+              value={formData.selectedClient?.id_cliente || ""}
+              onChange={(e) => {
+                const client = clients.find(
+                  (c) => c.id_cliente === parseInt(e.target.value)
+                );
+                setFormData((prev) => ({ ...prev, selectedClient: client }));
+              }}
+              disabled={loading}
+            >
+              <option value="">Seleccione un cliente</option>
+              {clients.map((client) => (
+                <option key={client.id_cliente} value={client.id_cliente}>
+                  {client.nombre_completo}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
 
-        {error && <p className="error-message">{error}</p>}
+          <div className="form-group">
+            <label className="form-label">
+              Título: <span className="required">*</span>
+            </label>
+            <input
+              type="text"
+              className="form-input"
+              value={formData.title}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, title: e.target.value }))
+              }
+              placeholder="Título del Evento"
+              disabled={loading}
+            />
+          </div>
 
-        <div className="button-group">
-          <button 
-            onClick={handleSave} 
-            className="save-btn"
-            disabled={loading}
-          >
-            {loading ? 'Guardando...' : 'Guardar'}
-          </button>
-          <button 
-            onClick={onClose} 
-            className="cancel-btn"
-            disabled={loading}
-          >
-            Cancelar
-          </button>
+          <div className="form-group">
+            <label className="form-label">
+              Fecha y Hora de Inicio: <span className="required">*</span>
+            </label>
+            <input
+              type="datetime-local"
+              className="form-input"
+              value={formData.startDateTime}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  startDateTime: e.target.value,
+                }))
+              }
+              disabled={loading}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Fecha y Hora de Término: <span className="required">*</span>
+            </label>
+            <input
+              type="datetime-local"
+              className="form-input"
+              value={formData.endDateTime}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  endDateTime: e.target.value,
+                }))
+              }
+              disabled={loading}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Tipo de Evento:</label>
+            <div className="radio-group">
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  value="meeting"
+                  checked={formData.eventType === "meeting"}
+                  onChange={() =>
+                    setFormData((prev) => ({ ...prev, eventType: "meeting" }))
+                  }
+                  disabled={loading}
+                />
+                <span>Crear Evento con Google Meet</span>
+              </label>
+              <label className="radio-label">
+                <input
+                  type="radio"
+                  value="event"
+                  checked={formData.eventType === "event"}
+                  onChange={() =>
+                    setFormData((prev) => ({ ...prev, eventType: "event" }))
+                  }
+                  disabled={loading}
+                />
+                <span>Crear solo un evento</span>
+              </label>
+            </div>
+          </div>
+
+          {error && (
+            <div className="error-message">
+              <span>⚠️ {error}</span>
+            </div>
+          )}
+
+          <div className="button-group">
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="save-button"
+            >
+              {loading
+                ? "Guardando..."
+                : initialData?.id
+                ? "Actualizar"
+                : "Guardar"}
+            </button>
+
+            {initialData?.id && (
+            <button
+              onClick={handleDelete}
+              disabled={loading}
+              className="delete-button"
+              type="button"
+            >
+              {loading ? 'Eliminando...' : 'Eliminar'}
+            </button>
+            )}
+
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="cancel-button"
+            >
+              Cancelar
+            </button>
+          </div>
+
+          {error && (
+            <div className="error-message">
+              <span>⚠️ {error}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

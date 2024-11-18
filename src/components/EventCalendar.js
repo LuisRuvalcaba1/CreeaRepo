@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
-import EventFormModal from './EventFormModal'; 
+import EventFormModal from './EventFormModal';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import './EventCalendar.css';
 
@@ -12,14 +12,12 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete }) => {
   const [showEventForm, setShowEventForm] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
 
-  // Cuando se selecciona un espacio en el calendario
   const handleSelectSlot = ({ start }) => {
     setSelectedDate(start);
     setSelectedEvent(null);
     setShowEventForm(true);
   };
 
-  // Cuando se selecciona un evento existente
   const handleSelectEvent = (event) => {
     setSelectedEvent(event);
     setSelectedDate(event.start);
@@ -27,32 +25,20 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete }) => {
   };
 
   const handleSaveEvent = (eventData) => {
-    const startDateTime = new Date(selectedDate);
-    const [hours, minutes] = eventData.time.split(':');
-    startDateTime.setHours(hours);
-    startDateTime.setMinutes(minutes);
-
-    const newEvent = {
-      id: selectedEvent ? selectedEvent.id : events.length + 1,
-      title: eventData.title,
-      start: startDateTime,
-      end: new Date(startDateTime.getTime() + 60 * 60 * 1000),
-      link: eventData.link,
-    };
-
     if (selectedEvent) {
-      onEventEdit({ ...selectedEvent, ...newEvent });
+      onEventEdit(eventData);
     } else {
-      onEventAdd(newEvent);
+      onEventAdd(eventData);
     }
-
     setShowEventForm(false);
   };
 
-  const handleDeleteEvent = () => {
-    if (selectedEvent) {
-      onEventDelete(selectedEvent);
+  const handleDeleteEvent = (event) => {
+    // Solo llamar a onEventDelete y cerrar el modal
+    if (event && event.id) {
+      onEventDelete(event);
       setShowEventForm(false);
+      setSelectedEvent(null);
     }
   };
 
@@ -74,8 +60,8 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete }) => {
           show={showEventForm}
           onClose={() => setShowEventForm(false)}
           onSave={handleSaveEvent}
-          initialData={selectedEvent}
           onDelete={handleDeleteEvent}
+          initialData={selectedEvent}
           selectedDate={selectedDate}
         />
       )}

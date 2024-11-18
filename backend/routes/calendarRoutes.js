@@ -7,62 +7,32 @@ const cron = require('node-cron');
 
 // Crear un evento y guardar en Google Calendar y en la base de datos
 router.post('/create-event', async (req, res) => {
-  const eventDetails = {
-    title: req.body.title,
-    description: req.body.description || '',
-    startDateTime: req.body.startDateTime,
-    endDateTime: req.body.endDateTime,
-    eventType: req.body.eventType,
-    createdBy: req.body.createdBy,
-    clientId: req.body.clientId,
-    meetLink: null,
-    googleEventId: null,
-  };
-
-  if (!eventDetails.title || !eventDetails.startDateTime || !eventDetails.endDateTime || !eventDetails.createdBy || !eventDetails.clientId) {
-    return res.status(400).json({ error: 'Datos incompletos para crear el evento' });
-  }
-  if (new Date(eventDetails.startDateTime) >= new Date(eventDetails.endDateTime)) {
-    return res.status(400).json({ error: 'La hora de término debe ser posterior a la hora de inicio.' });
-  }  
+  console.log("Datos recibidos para crear evento:", req.body);
 
   try {
-    if (eventDetails.eventType === 'meeting') {
-      const googleEvent = await createGoogleEvent({
-        title: eventDetails.title,
-        description: eventDetails.description,
-        startDateTime: eventDetails.startDateTime,
-        endDateTime: eventDetails.endDateTime,
-        attendees: req.body.attendees || [],
-      });
-
-      eventDetails.meetLink = googleEvent.meetLink || null;
-      eventDetails.googleEventId = googleEvent.googleEventId;
-    }
+    const eventDetails = {
+      title: req.body.title,
+      startDateTime: req.body.startDateTime,
+      endDateTime: req.body.endDateTime,
+      eventType: req.body.eventType || 'event',
+      createdBy: req.body.createdBy,
+      clientId: req.body.clientId,
+      meetLink: req.body.meetLink,
+      googleEventId: req.body.googleEventId
+    };
 
     const savedEvent = await createEvent(eventDetails);
 
-    if (req.body.attendees && req.body.attendees.length > 0) {
-      try {
-        await enviarConfirmacionCita({
-          to: req.body.attendees[0].email,
-          subject: 'Confirmación de Evento',
-          text: `Tu evento ha sido programado para el ${eventDetails.startDateTime}. Únete con este enlace: ${eventDetails.meetLink || 'No hay enlace de Meet'}`,
-        });
-      } catch (error) {
-        console.error('Error al enviar el correo de confirmación:', error);
-      }
-    }
-
     res.status(201).json({
       message: 'Evento creado exitosamente',
-      eventData: savedEvent,
-      meetLink: eventDetails.meetLink,
-      googleEventId: eventDetails.googleEventId,
+      eventData: savedEvent
     });
   } catch (error) {
-    console.error('Error al crear el evento:', error);
-    res.status(500).json({ error: 'Error al crear el evento', details: error.message });
+    console.error("Error en la ruta de crear evento:", error);
+    res.status(500).json({ 
+      error: 'Error al crear el evento', 
+      details: error.message 
+    });
   }
 });
 
@@ -146,43 +116,36 @@ router.get('/get-events-promotor', async (req, res) => {
 // Actualizar un evento en la base de datos y en Google Calendar
 router.put('/update-event/:eventId', async (req, res) => {
   const { eventId } = req.params;
-  const { title, description, startDateTime, endDateTime, eventType, attendees } = req.body;
-
-  if (!title || !startDateTime || !endDateTime) {
-    return res.status(400).json({ error: 'Datos incompletos para actualizar el evento' });
-  }
-
-  if (new Date(startDateTime) >= new Date(endDateTime)) {
-    return res.status(400).json({ error: 'La hora de término debe ser posterior a la hora de inicio.' });
-  }
+  console.log("Actualizando evento:", { eventId, body: req.body });
 
   try {
-    const updatedDetails = {
-      title,
-      description,
-      startDateTime,
-      endDateTime,
-      eventType,
-    };
-
-    const event = await updateEvent(eventId, updatedDetails);
-
-    if (event.googleEventId) {
-      await updateGoogleEvent(event.googleEventId, {
-        title,
-        description,
-        startDateTime,
-        endDateTime,
-        attendees,
-      });
+    if (!req.body.title || !req.body.startDateTime || !req.body.endDateTime) {
+      return res.status(400).json({ error: 'Faltan campos requeridos' });
     }
 
-    res.status(200).json({ message: 'Evento actualizado correctamente', event });
+    const eventDetails = {
+      title: req.body.title,
+      startDateTime: req.body.startDateTime,
+      endDateTime: req.body.endDateTime,
+      eventType: req.body.eventType || 'event',
+      meetLink: req.body.meetLink
+    };
+
+    const updatedEvent = await updateEvent(eventId, eventDetails);
+
+    res.status(200).json({
+      message: 'Evento actualizado exitosamente',
+      eventData: updatedEvent
+    });
   } catch (error) {
-    console.error('Error al actualizar el evento:', error);
-    res.status(500).json({ error: 'Error al actualizar el evento.', details: error.message });
+    console.error("Error al actualizar evento:", error);
+    res.status(500).json({
+      error: 'Error al actualizar el evento',
+      details: error.message
+    });
   }
 });
+
 // Obtener eventos para un usuario
 router.get('/events', async (req, res) => {
   const { userId } = req.query;
@@ -205,33 +168,22 @@ router.get('/events', async (req, res) => {
 // Eliminar un evento y enviar correo de cancelación
 router.delete('/delete-event/:eventId', async (req, res) => {
   const { eventId } = req.params;
+  console.log("Eliminando evento:", eventId);
 
   try {
-    const event = await deleteEvent(eventId);
-
-    if (event.googleEventId) {
-      await deleteGoogleEvent(event.googleEventId);
-    }
-
-    // Enviar correo de cancelación al cliente
-    if (event.clientId && event.clientEmail) { // Asegurar que clientEmail esté definido
-      try {
-        await enviarCorreoCancelacion({
-          to: event.clientEmail, // Correo del cliente asociado
-          subject: 'Cancelación de Evento',
-          text: `El evento titulado "${event.title}" programado para el ${event.startDateTime} ha sido cancelado.`,
-        });
-      } catch (error) {
-        console.error('Error al enviar el correo de cancelación:', error);
-      }
-    }
-
-    res.status(200).json({ message: 'Evento eliminado correctamente' });
+    await deleteEvent(eventId);
+    res.status(200).json({
+      message: 'Evento eliminado exitosamente'
+    });
   } catch (error) {
-    console.error('Error al eliminar el evento:', error);
-    res.status(500).json({ error: 'Error al eliminar el evento' });
+    console.error("Error al eliminar evento:", error);
+    res.status(500).json({
+      error: 'Error al eliminar el evento',
+      details: error.message
+    });
   }
 });
+
 // Bloquear intervalos de tiempo para un asesor
 router.post('/block-interval', async (req, res) => {
   const { userId, startDateTime, endDateTime } = req.body;

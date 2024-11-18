@@ -11,66 +11,32 @@ const { enviarConfirmacionCita } = require("../services/emailService");
  */
 async function createEvent(eventDetails) {
   const connection = getConnection();
-  let googleEvent = {};
+  console.log("Creando evento con detalles:", eventDetails);
 
-  // Validar datos antes de continuar
-  if (
-    !eventDetails.title ||
-    !eventDetails.startDateTime ||
-    !eventDetails.endDateTime ||
-    !eventDetails.createdBy ||
-    !eventDetails.clientId
-  ) {
-    throw new Error("Faltan campos obligatorios para crear el evento.");
-  }
-
-  // Verificar que el cliente pertenezca al asesor
   try {
-    const [clientCheck] = await connection.query(
-      `SELECT c.*, u.correo_electronico, c.nombre_completo
-       FROM cliente c
-       JOIN usuario u ON c.id_usuario = u.id_usuario
-       WHERE c.id_cliente = ?`,
-      [eventDetails.clientId]
-    );
+    // Si es un evento tipo meeting, crear el evento en Google Calendar primero
+    let meetLink = null;
+    let googleEventId = null;
 
-    if (!clientCheck.length) {
-      throw new Error("Cliente no encontrado");
+    if (eventDetails.eventType === 'meeting') {
+      try {
+        const googleEvent = await createGoogleEvent({
+          title: eventDetails.title,
+          startDateTime: eventDetails.startDateTime,
+          endDateTime: eventDetails.endDateTime,
+          attendees: eventDetails.attendees || []
+        });
+
+        meetLink = googleEvent.meetLink;
+        googleEventId = googleEvent.googleEventId;
+        console.log("Evento de Google creado:", { meetLink, googleEventId });
+      } catch (error) {
+        console.error("Error al crear evento en Google:", error);
+        throw new Error("No se pudo crear el evento en Google Calendar");
+      }
     }
 
-    // Permite crear eventos si es el asesor asignado
-    if (clientCheck[0].id_asesor !== parseInt(eventDetails.createdBy)) {
-      throw new Error("No tienes permiso para crear eventos para este cliente.");
-    }
-
-    eventDetails.clientEmail = clientCheck[0].correo_electronico;
-    eventDetails.clientName = clientCheck[0].nombre_usuario;
-  } catch (error) {
-    console.error("Error al verificar permisos:", error);
-    throw error;
-  }
-
-  // Crear evento en Google Calendar si es una reunión
-  if (eventDetails.eventType === "meeting") {
-    try {
-      googleEvent = await createGoogleEvent({
-        title: eventDetails.title,
-        startDateTime: eventDetails.startDateTime,
-        endDateTime: eventDetails.endDateTime,
-        attendees: eventDetails.attendees || [],
-      });
-
-      eventDetails.meetLink = googleEvent.meetLink || null;
-      eventDetails.googleEventId = googleEvent.googleEventId || null;
-    } catch (error) {
-      console.error("Error al crear evento en Google Meet:", error.message);
-      throw new Error("Error al crear el evento en Google Meet.");
-    }
-  }
-
-  // Insertar evento en la base de datos
-  try {
-    // Formatear las fechas para MySQL
+    // Formatear fechas para MySQL
     const formattedStartDate = new Date(eventDetails.startDateTime)
       .toISOString()
       .slice(0, 19)
@@ -80,6 +46,7 @@ async function createEvent(eventDetails) {
       .slice(0, 19)
       .replace('T', ' ');
 
+    // Insertar en la base de datos
     const [result] = await connection.query(
       `INSERT INTO events (
         title, 
@@ -90,64 +57,71 @@ async function createEvent(eventDetails) {
         created_by, 
         client_id, 
         google_event_id
-      ) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         eventDetails.title,
         formattedStartDate,
         formattedEndDate,
         eventDetails.eventType,
-        eventDetails.meetLink || null,
+        meetLink,
         eventDetails.createdBy,
         eventDetails.clientId,
-        eventDetails.googleEventId || null,
+        googleEventId
       ]
     );
 
-    const savedEvent = {
-      id: result.insertId,
-      ...eventDetails,
-      start: formattedStartDate,
-      end: formattedEndDate,
-    };
+    // Obtener información del cliente para el correo
+    const [clientInfo] = await connection.query(
+      `SELECT c.*, u.correo_electronico 
+       FROM cliente c 
+       JOIN usuario u ON c.id_usuario = u.id_usuario 
+       WHERE c.id_cliente = ?`,
+      [eventDetails.clientId]
+    );
 
-    // Enviar correo de confirmación
-    if (eventDetails.clientEmail) {
-      try {
-        const startDate = new Date(eventDetails.startDateTime);
-        
-        await enviarConfirmacionCita({
-          to: eventDetails.clientEmail,
-          eventDate: startDate.toLocaleDateString('es-MX', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          }),
-          eventTime: startDate.toLocaleTimeString('es-MX', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-          }),
-          link: eventDetails.meetLink || 'No hay enlace disponible'
-        });
-      } catch (emailError) {
-        console.error("Error al enviar la confirmación de cita:", emailError);
-        // No interrumpir la creación del evento si falla el envío del correo
-      }
+    if (clientInfo.length > 0 && eventDetails.eventType === 'meeting') {
+      // Enviar correo de confirmación
+      const startDate = new Date(eventDetails.startDateTime);
+      await enviarConfirmacionCita({
+        to: clientInfo[0].correo_electronico,
+        eventDate: startDate.toLocaleDateString('es-MX', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        eventTime: startDate.toLocaleTimeString('es-MX', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }),
+        link: meetLink
+      });
     }
 
+    const savedEvent = {
+      id: result.insertId,
+      title: eventDetails.title,
+      start: formattedStartDate,
+      end: formattedEndDate,
+      eventType: eventDetails.eventType,
+      meetLink,
+      createdBy: eventDetails.createdBy,
+      clientId: eventDetails.clientId,
+      googleEventId
+    };
+
     return savedEvent;
+
   } catch (error) {
-    console.error("Error al insertar evento:", error);
-    throw new Error("Error al guardar el evento en la base de datos: " + error.message);
+    console.error("Error al crear evento:", error);
+    throw error;
   }
 }
 
-
 const getClientsByAdvisor = async (advisorId) => {
   const connection = getConnection();
-  
+
   try {
     const [clients] = await connection.query(
       `SELECT * FROM cliente c
@@ -156,11 +130,11 @@ const getClientsByAdvisor = async (advisorId) => {
       ORDER BY c.nombre_completo ASC`,
       [advisorId]
     );
-    
+
     return clients;
   } catch (error) {
-    console.error('Error al obtener clientes:', error);
-    throw new Error('Error al obtener los clientes del asesor');
+    console.error("Error al obtener clientes:", error);
+    throw new Error("Error al obtener los clientes del asesor");
   }
 };
 /**
@@ -208,58 +182,106 @@ const getEventsByUser = async (userId) => {
 /**
  * Actualizar un evento en la base de datos y en Google Calendar
  */
-async function updateEvent(eventId, updatedDetails) {
+async function updateEvent(eventId, eventDetails) {
   const connection = getConnection();
-  const { title, startDateTime, endDateTime, eventType } = updatedDetails;
+  console.log("Actualizando evento:", { eventId, eventDetails });
 
-  const [event] = await connection.query(
-    `SELECT google_event_id FROM events WHERE id = ?`,
-    [eventId]
-  );
-  if (!event.length) {
-    throw new Error("Evento no encontrado");
+  try {
+    // Formatear fechas para MySQL
+    const formattedStartDate = new Date(eventDetails.startDateTime)
+      .toISOString()
+      .slice(0, 19)
+      .replace('T', ' ');
+    const formattedEndDate = new Date(eventDetails.endDateTime)
+      .toISOString()
+      .slice(0, 19)
+      .replace('T', ' ');
+
+    // Verificar si el evento existe
+    const [existingEvent] = await connection.query(
+      'SELECT * FROM events WHERE id = ?',
+      [eventId]
+    );
+
+    if (existingEvent.length === 0) {
+      throw new Error('Evento no encontrado');
+    }
+
+    const [result] = await connection.query(
+      `UPDATE events SET 
+        title = ?,
+        start_datetime = ?,
+        end_datetime = ?,
+        event_type = ?,
+        meet_link = ?
+      WHERE id = ?`,
+      [
+        eventDetails.title,
+        formattedStartDate,
+        formattedEndDate,
+        eventDetails.eventType,
+        eventDetails.meetLink || null,
+        eventId
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      throw new Error('No se pudo actualizar el evento');
+    }
+
+    // Devolver el evento actualizado
+    return {
+      id: eventId,
+      ...eventDetails,
+      start: formattedStartDate,
+      end: formattedEndDate
+    };
+
+  } catch (error) {
+    console.error("Error al actualizar evento:", error);
+    throw error;
   }
-
-  await updateGoogleEvent(event[0].google_event_id, {
-    title,
-    startDateTime,
-    endDateTime,
-    eventType,
-    attendees: updatedDetails.attendees || [],
-  });
-
-  const [result] = await connection.query(
-    `UPDATE events 
-         SET title = ?, start_datetime = ?, end_datetime = ?, event_type = ?
-         WHERE id = ?`,
-    [title, startDateTime, endDateTime, eventType, eventId]
-  );
-
-  return result.affectedRows > 0;
 }
 
 /**
  * Eliminar un evento de la base de datos y de Google Calendar
  */
+
 async function deleteEvent(eventId) {
   const connection = getConnection();
+  console.log("Eliminando evento:", eventId);
 
-  const [event] = await connection.query(
-    `SELECT google_event_id FROM events WHERE id = ?`,
-    [eventId]
-  );
-  if (!event.length) {
-    throw new Error("Evento no encontrado");
+  try {
+    // Verificar si el evento existe
+    const [existingEvent] = await connection.query(
+      'SELECT * FROM events WHERE id = ?',
+      [eventId]
+    );
+
+    if (existingEvent.length === 0) {
+      throw new Error('Evento no encontrado');
+    }
+
+    const [result] = await connection.query(
+      'DELETE FROM events WHERE id = ?',
+      [eventId]
+    );
+
+    if (result.affectedRows === 0) {
+      throw new Error('No se pudo eliminar el evento');
+    }
+
+    return {
+      success: true,
+      message: 'Evento eliminado correctamente'
+    };
+
+  } catch (error) {
+    console.error("Error al eliminar evento:", error);
+    throw error;
   }
-
-  await deleteGoogleEvent(event[0].google_event_id);
-
-  const [result] = await connection.query(`DELETE FROM events WHERE id = ?`, [
-    eventId,
-  ]);
-
-  return result.affectedRows > 0;
 }
+
 
 /**
  * Obtener eventos programados para las próximas 24 horas
