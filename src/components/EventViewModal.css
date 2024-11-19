@@ -54,7 +54,7 @@
   
   .event-type {
     background-color: #e3f2fd;
-    color: #1565c0;
+    color: #ffffff;
   }
   
   .close-button {
@@ -131,7 +131,7 @@
   }
   
   .meet-link:hover {
-    background-color: #1557b0;
+    background-color: #777e86;
   }
   
   .modal-footer {

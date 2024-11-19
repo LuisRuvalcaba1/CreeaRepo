@@ -294,7 +294,6 @@ const PromoterDashboard = () => {
       <Header />
       <div className="main-content">
         <div className="left-section">
-          <button className="account-btn container">Mi cuenta</button>
 
           <div className="products-section container">
             <h2>Productos</h2>
@@ -371,14 +370,12 @@ const PromoterDashboard = () => {
         <div className="right-section">
           <div className="agenda-section container">
             <h2>Calendario</h2>
-            <button onClick={handleAddEvent} className="add-event-button">
-              Agregar Evento
-            </button>
             <EventCalendar
               events={events}
               onEventClick={handleEventClick}
               onEventAdd={handleAddEvent}
               onEventDelete={handleDeleteEvent}
+              userType="promoter"
             />
           </div>
 

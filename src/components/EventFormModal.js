@@ -8,6 +8,7 @@ const EventFormModal = ({
   onDelete,
   initialData = {},
   selectedDate,
+  userType,
 }) => {
   const [formData, setFormData] = useState({
     title: "",
@@ -19,6 +20,7 @@ const EventFormModal = ({
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [advisors, setAdvisors] = useState([]);
 
   useEffect(() => {
     if (show && selectedDate) {
@@ -34,9 +36,28 @@ const EventFormModal = ({
         endDateTime: formatDateTimeForInput(endDate),
       }));
 
-      loadClients();
+      if (userType === 'advisor') {
+        loadClients();
+      }
+      if (userType === "promoter") {
+        loadAdvisors();
+      }
     }
-  }, [show, selectedDate]);
+  }, [show, selectedDate, userType]);
+
+  const loadAdvisors = async () => {
+    try {
+      const response = await fetch("/api/calendar/advisors");
+      if (!response.ok) {
+        throw new Error(`Error al cargar asesores: ${response.statusText}`);
+      }
+      const data = await response.json();
+      setAdvisors(data);
+    } catch (err) {
+      setError("Error al cargar la lista de asesores");
+      console.error("Error loading advisors:", err);
+    }
+  };
 
   useEffect(() => {
     if (!show) {
@@ -67,14 +88,6 @@ const EventFormModal = ({
     return d.toISOString().slice(0, 16);
   };
 
-  const formatDateTimeForAPI = (dateString) => {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      throw new Error("Fecha inválida");
-    }
-    return date.toISOString();
-  };
-
   const loadClients = async () => {
     const advisorId = sessionStorage.getItem("userId");
     if (!advisorId) {
@@ -101,9 +114,11 @@ const EventFormModal = ({
     if (!formData.title.trim()) {
       throw new Error("El título es obligatorio");
     }
-    if (!formData.selectedClient) {
+
+    if (userType === "advisor" && !formData.selectedClient) {
       throw new Error("Por favor, seleccione un cliente");
     }
+
     if (!formData.startDateTime || !formData.endDateTime) {
       throw new Error("Las fechas de inicio y término son obligatorias");
     }
@@ -116,9 +131,7 @@ const EventFormModal = ({
     }
 
     if (start >= end) {
-      throw new Error(
-        "La hora de término debe ser posterior a la hora de inicio"
-      );
+      throw new Error("La hora de término debe ser posterior a la hora de inicio");
     }
   };
 
@@ -129,32 +142,44 @@ const EventFormModal = ({
     try {
       validateForm();
 
-      const advisorId = sessionStorage.getItem("userId");
-      if (!advisorId) {
-        throw new Error("No se encontró ID del asesor");
+      const userId = sessionStorage.getItem("userId");
+      const userEmail = sessionStorage.getItem("userEmail");
+
+      if (!userId) {
+        throw new Error("No se encontró ID del usuario");
       }
 
-      const eventData = {
+      let eventData = {
         title: formData.title.trim(),
-        startDateTime: formatDateTimeForAPI(formData.startDateTime),
-        endDateTime: formatDateTimeForAPI(formData.endDateTime),
+        startDateTime: formData.startDateTime,
+        endDateTime: formData.endDateTime,
         eventType: formData.eventType,
-        createdBy: parseInt(advisorId),
-        clientId: parseInt(formData.selectedClient.id_cliente),
-        attendees: [{ email: formData.selectedClient.correo_electronico }],
+        createdBy: parseInt(userId),
       };
+
+      if (userType === "advisor") {
+        eventData = {
+          ...eventData,
+          clientId: formData.selectedClient.id_cliente,
+          attendees: [{ email: formData.selectedClient.correo_electronico }],
+        };
+      } else if (userType === "client") {
+        eventData.clientEmail = userEmail;
+      }
 
       let response;
       if (initialData?.id) {
-        // Si hay ID, es una actualización
         response = await fetch(`/api/calendar/update-event/${initialData.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(eventData),
         });
       } else {
-        // Si no hay ID, es una creación
-        response = await fetch("/api/calendar/create-event", {
+        const endpoint = userType === "client" 
+          ? "/api/calendar/create-event-client"
+          : "/api/calendar/create-event";
+          
+        response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(eventData),
@@ -181,22 +206,21 @@ const EventFormModal = ({
     e.preventDefault();
     e.stopPropagation();
     if (loading || !initialData?.id) return;
-  
-    if (window.confirm('¿Estás seguro de que deseas eliminar este evento?')) {
+
+    if (window.confirm("¿Estás seguro de que deseas eliminar este evento?")) {
       setLoading(true);
       try {
-        // Pasar solo el ID al padre
         onDelete(initialData.id);
         onClose();
       } catch (error) {
-        setError('Error al eliminar el evento');
-        console.error('Error:', error);
+        setError("Error al eliminar el evento");
+        console.error("Error:", error);
       } finally {
         setLoading(false);
       }
     }
   };
-  
+
   if (!show) return null;
 
   return (
@@ -207,29 +231,32 @@ const EventFormModal = ({
         </h2>
 
         <div className="form-container">
-          <div className="form-group">
-            <label className="form-label">
-              Cliente: <span className="required">*</span>
-            </label>
-            <select
-              className="form-select"
-              value={formData.selectedClient?.id_cliente || ""}
-              onChange={(e) => {
-                const client = clients.find(
-                  (c) => c.id_cliente === parseInt(e.target.value)
-                );
-                setFormData((prev) => ({ ...prev, selectedClient: client }));
-              }}
-              disabled={loading}
-            >
-              <option value="">Seleccione un cliente</option>
-              {clients.map((client) => (
-                <option key={client.id_cliente} value={client.id_cliente}>
-                  {client.nombre_completo}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Selector de cliente solo para asesores */}
+          {userType === "advisor" && (
+            <div className="form-group">
+              <label className="form-label">
+                Cliente: <span className="required">*</span>
+              </label>
+              <select
+                className="form-select"
+                value={formData.selectedClient?.id_cliente || ""}
+                onChange={(e) => {
+                  const client = clients.find(
+                    (c) => c.id_cliente === parseInt(e.target.value)
+                  );
+                  setFormData((prev) => ({ ...prev, selectedClient: client }));
+                }}
+                disabled={loading}
+              >
+                <option value="">Seleccione un cliente</option>
+                {clients.map((client) => (
+                  <option key={client.id_cliente} value={client.id_cliente}>
+                    {client.nombre_completo}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">
@@ -333,14 +360,14 @@ const EventFormModal = ({
             </button>
 
             {initialData?.id && (
-            <button
-              onClick={handleDelete}
-              disabled={loading}
-              className="delete-button"
-              type="button"
-            >
-              {loading ? 'Eliminando...' : 'Eliminar'}
-            </button>
+              <button
+                onClick={handleDelete}
+                disabled={loading}
+                className="delete-button"
+                type="button"
+              >
+                {loading ? "Eliminando..." : "Eliminar"}
+              </button>
             )}
 
             <button
@@ -351,12 +378,6 @@ const EventFormModal = ({
               Cancelar
             </button>
           </div>
-
-          {error && (
-            <div className="error-message">
-              <span>⚠️ {error}</span>
-            </div>
-          )}
         </div>
       </div>
     </div>

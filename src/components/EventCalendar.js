@@ -7,7 +7,7 @@ import "./EventCalendar.css";
 
 const localizer = momentLocalizer(moment);
 
-const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete }) => {
+const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete, userType }) => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventForm, setShowEventForm] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -74,7 +74,7 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete }) => {
         eventPropGetter={eventStyleGetter}
       />
 
-      {showEventForm && (
+{showEventForm && (
         <EventFormModal
           show={showEventForm}
           onClose={() => setShowEventForm(false)}
@@ -82,6 +82,7 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete }) => {
           onDelete={handleDeleteEvent}
           initialData={selectedEvent}
           selectedDate={selectedDate}
+          userType={userType} // Añadir esta prop
         />
       )}
     </div>

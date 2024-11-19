@@ -83,6 +83,114 @@ async function createEvent(eventDetails) {
   }
 }
 
+const createEventByClient = async (eventDetails) => {
+  const connection = getConnection();
+  console.log("Creando evento de cliente con detalles:", eventDetails);
+
+  try {
+    // Obtener el id_asesor del cliente
+    const { advisorId, advisorEmail } = await getClientAdvisor(eventDetails.createdBy);
+    
+    let meetLink = null;
+    let googleEventId = null;
+
+    // Crear evento en Google Calendar si es de tipo meeting
+    if (eventDetails.eventType === "meeting") {
+      try {
+        const googleEvent = await createGoogleEvent({
+          title: eventDetails.title,
+          startDateTime: eventDetails.startDateTime,
+          endDateTime: eventDetails.endDateTime,
+          // Incluir tanto al cliente como al asesor en el evento
+          attendees: [
+            { email: eventDetails.clientEmail },
+            { email: advisorEmail }
+          ]
+        });
+
+        meetLink = googleEvent.meetLink;
+        googleEventId = googleEvent.googleEventId;
+      } catch (error) {
+        console.error("Error al crear evento en Google:", error);
+        throw new Error("No se pudo crear el evento en Google Calendar");
+      }
+    }
+
+    const formattedStartDate = new Date(eventDetails.startDateTime)
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
+    const formattedEndDate = new Date(eventDetails.endDateTime)
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
+
+    const [result] = await connection.query(
+      `INSERT INTO events (
+        title, 
+        start_datetime, 
+        end_datetime, 
+        event_type, 
+        meet_link, 
+        created_by, 
+        client_id,
+        google_event_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        eventDetails.title,
+        formattedStartDate,
+        formattedEndDate,
+        eventDetails.eventType,
+        meetLink,
+        eventDetails.createdBy,
+        advisorId, // Usar el id del asesor asignado
+        googleEventId
+      ]
+    );
+
+    return {
+      id: result.insertId,
+      title: eventDetails.title,
+      start: formattedStartDate,
+      end: formattedEndDate,
+      eventType: eventDetails.eventType,
+      clientId: eventDetails.createdBy,
+      advisorId: advisorId,
+      meetLink,
+      createdBy: eventDetails.createdBy,
+      googleEventId
+    };
+  } catch (error) {
+    console.error("Error al crear evento:", error);
+    throw error;
+  }
+};
+
+const getClientAdvisor = async (clientId) => {
+  const connection = getConnection();
+  try {
+    const [result] = await connection.query(
+      `SELECT id_asesor, a.correo_electronico as advisor_email
+       FROM cliente c
+       JOIN usuario a ON c.id_asesor = a.id_usuario
+       WHERE c.id_usuario = ?`,
+      [clientId]
+    );
+    
+    if (result.length === 0) {
+      throw new Error('Cliente no encontrado o sin asesor asignado');
+    }
+    
+    return {
+      advisorId: result[0].id_asesor,
+      advisorEmail: result[0].advisor_email
+    };
+  } catch (error) {
+    console.error("Error al obtener el asesor del cliente:", error);
+    throw error;
+  }
+};
+
 const getAdvisors = async () => {
   const connection = getConnection();
   try {
@@ -355,4 +463,6 @@ module.exports = {
   getAdvisors,
   getClientsByUserType,
   getAllClients,
+  createEventByClient,
+  
 };
