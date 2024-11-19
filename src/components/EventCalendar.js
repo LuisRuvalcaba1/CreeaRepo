@@ -14,7 +14,6 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete, userTyp
 
   const eventStyleGetter = (event) => {
     let className = "";
-
     switch (event.event_type) {
       case "advisor":
         className = "rbc-event-asesor";
@@ -25,10 +24,7 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete, userTyp
       default:
         className = "rbc-event";
     }
-
-    return {
-      className: className,
-    };
+    return { className };
   };
 
   const handleSelectSlot = ({ start }) => {
@@ -43,22 +39,50 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete, userTyp
     setShowEventForm(true);
   };
 
-  const handleSaveEvent = (eventData) => {
-    if (selectedEvent) {
-      onEventEdit(eventData);
-    } else {
-      onEventAdd(eventData);
+  const handleSaveEvent = async (eventData) => {
+    try {
+      if (selectedEvent) {
+        await onEventEdit(eventData);
+      } else {
+        await onEventAdd(eventData);
+      }
+      setShowEventForm(false);
+    } catch (error) {
+      console.error("Error al guardar el evento:", error);
+      // Aquí podrías mostrar un mensaje de error al usuario
     }
-    setShowEventForm(false);
   };
 
-  const handleDeleteEvent = (event) => {
+  const handleDeleteEvent = async (event) => {
     if (event) {
-      onEventDelete(event.id || event);
-      setShowEventForm(false);
-      setSelectedEvent(null);
+      try {
+        await onEventDelete(event.id || event);
+        setShowEventForm(false);
+        setSelectedEvent(null);
+      } catch (error) {
+        console.error("Error al eliminar el evento:", error);
+        // Aquí podrías mostrar un mensaje de error al usuario
+      }
     }
   };
+
+  const CustomEvent = ({ event }) => (
+    <div className="rbc-event-content">
+      <span className="event-title">{event.title}</span>
+      {event.meetLink && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            window.open(event.meetLink, '_blank');
+          }}
+          className="meet-link-button"
+          title="Unirse a la reunión"
+        >
+          Meet
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="calendar-container">
@@ -72,9 +96,12 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete, userTyp
         onSelectSlot={handleSelectSlot}
         onSelectEvent={handleSelectEvent}
         eventPropGetter={eventStyleGetter}
+        components={{
+          event: CustomEvent
+        }}
       />
 
-{showEventForm && (
+      {showEventForm && (
         <EventFormModal
           show={showEventForm}
           onClose={() => setShowEventForm(false)}
@@ -82,7 +109,7 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete, userTyp
           onDelete={handleDeleteEvent}
           initialData={selectedEvent}
           selectedDate={selectedDate}
-          userType={userType} // Añadir esta prop
+          userType={userType}
         />
       )}
     </div>

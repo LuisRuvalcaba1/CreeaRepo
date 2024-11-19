@@ -43,11 +43,11 @@ const AdvisorDashboard = () => {
     setIsLoadingNotes(true);
     try {
       const response = await axios.get(`/api/notes/client/${clientId}`, {
-        params: { advisorId }
+        params: { advisorId },
       });
-      setClientNotes(prev => ({
+      setClientNotes((prev) => ({
         ...prev,
-        [clientId]: response.data
+        [clientId]: response.data,
       }));
     } catch (error) {
       console.error("Error al cargar las notas:", error);
@@ -67,15 +67,15 @@ const AdvisorDashboard = () => {
       const response = await axios.post("/api/notes/create", {
         id_cliente: clientId,
         id_asesor: advisorId,
-        contenido: newNote
+        contenido: newNote,
       });
 
       // Actualizar el estado local con la nueva nota
-      setClientNotes(prev => ({
+      setClientNotes((prev) => ({
         ...prev,
-        [clientId]: [...(prev[clientId] || []), response.data]
+        [clientId]: [...(prev[clientId] || []), response.data],
       }));
-      
+
       setNewNote(""); // Limpiar el campo de nota
       alert("Nota guardada exitosamente");
     } catch (error) {
@@ -95,15 +95,15 @@ const AdvisorDashboard = () => {
     try {
       const response = await axios.put(`/api/notes/${noteId}`, {
         contenido: editNoteContent,
-        advisorId
+        advisorId,
       });
 
       // Actualizar el estado local con la nota editada
-      setClientNotes(prev => ({
+      setClientNotes((prev) => ({
         ...prev,
-        [clientId]: prev[clientId].map(note => 
+        [clientId]: prev[clientId].map((note) =>
           note.id_nota === noteId ? response.data : note
-        )
+        ),
       }));
 
       setEditingNote(null);
@@ -123,13 +123,13 @@ const AdvisorDashboard = () => {
 
     try {
       await axios.delete(`/api/notes/${noteId}`, {
-        params: { advisorId }
+        params: { advisorId },
       });
 
       // Actualizar el estado local eliminando la nota
-      setClientNotes(prev => ({
+      setClientNotes((prev) => ({
         ...prev,
-        [clientId]: prev[clientId].filter(note => note.id_nota !== noteId)
+        [clientId]: prev[clientId].filter((note) => note.id_nota !== noteId),
       }));
 
       alert("Nota eliminada exitosamente");
@@ -367,10 +367,12 @@ const AdvisorDashboard = () => {
         startDateTime: new Date(meetingDetails.startDateTime).toISOString(),
         endDateTime: new Date(meetingDetails.endDateTime).toISOString(),
         eventType: meetingDetails.eventType,
-        clientId: parseInt(selectedClient.id_cliente),
+        clientId: parseInt(selectedClient.id_usuario), // Changed from id_cliente to id_usuario
         createdBy: parseInt(advisorId),
         attendees: [{ email: selectedClient.correo_electronico }],
       };
+
+      console.log("Datos del evento:", eventData); // Para debugging
 
       if (editingEvent) {
         await axios.put(
@@ -445,16 +447,16 @@ const AdvisorDashboard = () => {
               </select>
             </div>
 
-           {filteredClients.slice(0, visibleClients).map((client) => (
+            {filteredClients.slice(0, visibleClients).map((client) => (
               <div key={client.id_cliente} className="client">
-                <div 
+                <div
                   onClick={() => toggleExpandClient(client.id_cliente)}
                   className="client-header"
                 >
                   <span className="bold">{client.nombre_completo}</span> -{" "}
                   {client.estado_cuenta}
                 </div>
-                
+
                 {expandedClient === client.id_cliente && (
                   <div className="client-details">
                     <ul>
@@ -465,7 +467,7 @@ const AdvisorDashboard = () => {
 
                     <div className="notes-section">
                       <h4>Notas del Cliente</h4>
-                      
+
                       {/* Área para crear nueva nota */}
                       <div className="new-note-area">
                         <textarea
@@ -475,7 +477,7 @@ const AdvisorDashboard = () => {
                           className="note-textarea"
                           maxLength="255"
                         />
-                        <button 
+                        <button
                           onClick={() => handleCreateNote(client.id_cliente)}
                           className="create-note-btn"
                         >
@@ -494,13 +496,20 @@ const AdvisorDashboard = () => {
                                 <div className="edit-note-area">
                                   <textarea
                                     value={editNoteContent}
-                                    onChange={(e) => setEditNoteContent(e.target.value)}
+                                    onChange={(e) =>
+                                      setEditNoteContent(e.target.value)
+                                    }
                                     className="note-textarea"
                                     maxLength="255"
                                   />
                                   <div className="note-actions">
                                     <button
-                                      onClick={() => handleSaveEditedNote(note.id_nota, client.id_cliente)}
+                                      onClick={() =>
+                                        handleSaveEditedNote(
+                                          note.id_nota,
+                                          client.id_cliente
+                                        )
+                                      }
                                       className="save-note-btn"
                                     >
                                       Guardar
@@ -517,7 +526,9 @@ const AdvisorDashboard = () => {
                                 <div className="note-content">
                                   <p>{note.contenido}</p>
                                   <small className="note-date">
-                                    {new Date(note.fecha_creacion).toLocaleString()}
+                                    {new Date(
+                                      note.fecha_creacion
+                                    ).toLocaleString()}
                                   </small>
                                   <div className="note-actions">
                                     <button
@@ -527,7 +538,12 @@ const AdvisorDashboard = () => {
                                       Editar
                                     </button>
                                     <button
-                                      onClick={() => handleDeleteNote(note.id_nota, client.id_cliente)}
+                                      onClick={() =>
+                                        handleDeleteNote(
+                                          note.id_nota,
+                                          client.id_cliente
+                                        )
+                                      }
                                       className="delete-btn"
                                     >
                                       Eliminar
@@ -598,18 +614,20 @@ const AdvisorDashboard = () => {
                 <label>
                   Cliente:
                   <select
-                    value={selectedClient?.id_cliente || ""}
+                    value={selectedClient?.id_usuario || ""} // Changed from id_cliente to id_usuario
                     onChange={(e) => {
                       const selected = clients.find(
                         (client) =>
-                          client.id_cliente === parseInt(e.target.value)
+                          client.id_usuario === parseInt(e.target.value) // Changed from id_cliente to id_usuario
                       );
                       setSelectedClient(selected || null);
                     }}
                   >
                     <option value="">Seleccione un cliente</option>
                     {clients.map((client) => (
-                      <option key={client.id_cliente} value={client.id_cliente}>
+                      <option key={client.id_usuario} value={client.id_usuario}>
+                        {" "}
+                        {/* Changed from id_cliente to id_usuario */}
                         {client.nombre_completo}
                       </option>
                     ))}

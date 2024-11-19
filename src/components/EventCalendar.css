@@ -167,3 +167,39 @@
     font-family: 'Orbitron', sans-serif;
     text-align: center;
 }
+
+.rbc-event-content {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 85px; /* Espacio para el botón */
+    min-height: 24px;
+  }
+  
+  .event-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+  }
+  
+  .meet-link-button {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: #29CFC5;
+    color: #01274D;
+    border: none;
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.3s ease;
+    z-index: 1;
+  }
+  
+  .meet-link-button:hover {
+    background-color: #1fa39b;
+  }
