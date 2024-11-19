@@ -9,6 +9,7 @@ const { enviarConfirmacionCita } = require("../services/emailService");
 /**
  * Crear un evento en la base de datos y en Google Calendar
  */
+
 async function createEvent(eventDetails) {
   const connection = getConnection();
   console.log("Creando evento con detalles:", eventDetails);
@@ -17,13 +18,27 @@ async function createEvent(eventDetails) {
     let meetLink = null;
     let googleEventId = null;
 
+    // Obtener correos de los participantes
+    const [clientEmail] = await connection.query(
+      'SELECT correo_electronico FROM usuario WHERE id_usuario = ?',
+      [eventDetails.clientId]
+    );
+
+    const [advisorEmail] = await connection.query(
+      'SELECT correo_electronico FROM usuario WHERE id_usuario = ?',
+      [eventDetails.createdBy]
+    );
+
     if (eventDetails.eventType === "meeting") {
       try {
         const googleEvent = await createGoogleEvent({
           title: eventDetails.title,
           startDateTime: eventDetails.startDateTime,
           endDateTime: eventDetails.endDateTime,
-          attendees: eventDetails.attendees || [],
+          attendees: [
+            { email: clientEmail[0].correo_electronico },
+            { email: advisorEmail[0].correo_electronico }
+          ],
         });
 
         meetLink = googleEvent.meetLink;
@@ -66,12 +81,20 @@ async function createEvent(eventDetails) {
       ]
     );
 
-    enviarConfirmacionCita({
-      title: eventDetails.title,
-      startDateTime: eventDetails.startDateTime,
-      endDateTime: eventDetails.endDateTime,
-      clientEmail: eventDetails.clientEmail,
-      advisorEmail: eventDetails.advisorEmail,
+    // Enviar correos de confirmación
+    await enviarConfirmacionCita({
+      to: clientEmail[0].correo_electronico,
+      eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
+      eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
+      link: meetLink
+    });
+
+    // También enviar correo al asesor
+    await enviarConfirmacionCita({
+      to: advisorEmail[0].correo_electronico,
+      eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
+      eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
+      link: meetLink
     });
 
     return {
@@ -96,7 +119,25 @@ const createEventByClient = async (eventDetails) => {
   console.log("Creando evento de cliente con detalles:", eventDetails);
 
   try {
-    const { advisorId, advisorEmail } = await getClientAdvisor(eventDetails.createdBy);
+    // Obtener información del asesor asignado al cliente
+    const [clientInfo] = await connection.query(
+      `SELECT 
+        c.id_asesor,
+        u.correo_electronico as client_email,
+        a.correo_electronico as advisor_email,
+        a.id_usuario as advisor_id
+       FROM cliente c
+       JOIN usuario u ON c.id_usuario = u.id_usuario
+       JOIN usuario a ON c.id_asesor = a.id_usuario
+       WHERE c.id_usuario = ?`,
+      [eventDetails.createdBy]
+    );
+
+    if (!clientInfo.length) {
+      throw new Error("No se encontró la información del cliente o asesor");
+    }
+
+    const { advisor_id, client_email, advisor_email } = clientInfo[0];
     let meetLink = null;
     let googleEventId = null;
 
@@ -107,21 +148,30 @@ const createEventByClient = async (eventDetails) => {
           startDateTime: eventDetails.startDateTime,
           endDateTime: eventDetails.endDateTime,
           attendees: [
-            { email: eventDetails.clientEmail },
-            { email: advisorEmail }
+            { email: client_email },
+            { email: advisor_email }
           ]
         });
 
         meetLink = googleEvent.meetLink;
         googleEventId = googleEvent.googleEventId;
 
-        // Enviar correo con link de meet
+        // Enviar correo al cliente
         await enviarConfirmacionCita({
-          to: eventDetails.clientEmail,
+          to: client_email,
           eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
           eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
           link: meetLink
         });
+
+        // Enviar correo al asesor asignado
+        await enviarConfirmacionCita({
+          to: advisor_email,
+          eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
+          eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
+          link: meetLink
+        });
+
       } catch (error) {
         console.error("Error al crear evento en Google:", error);
         throw new Error("No se pudo crear el evento en Google Calendar");
@@ -138,8 +188,16 @@ const createEventByClient = async (eventDetails) => {
       .replace("T", " ");
 
     const [result] = await connection.query(
-      `INSERT INTO events (title, start_datetime, end_datetime, event_type, meet_link, created_by, client_id, google_event_id) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO events (
+        title, 
+        start_datetime, 
+        end_datetime, 
+        event_type, 
+        meet_link, 
+        created_by, 
+        client_id, 
+        google_event_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         eventDetails.title,
         formattedStartDate,
@@ -147,7 +205,7 @@ const createEventByClient = async (eventDetails) => {
         eventDetails.eventType,
         meetLink,
         eventDetails.createdBy,
-        advisorId,
+        advisor_id, // Usamos el ID del asesor asignado como client_id
         googleEventId
       ]
     );
@@ -159,7 +217,7 @@ const createEventByClient = async (eventDetails) => {
       end: formattedEndDate,
       eventType: eventDetails.eventType,
       clientId: eventDetails.createdBy,
-      advisorId: advisorId,
+      advisorId: advisor_id,
       meetLink,
       createdBy: eventDetails.createdBy,
       googleEventId
