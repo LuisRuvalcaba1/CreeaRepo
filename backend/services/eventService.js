@@ -14,11 +14,10 @@ async function createEvent(eventDetails) {
   console.log("Creando evento con detalles:", eventDetails);
 
   try {
-    // Si es un evento tipo meeting, crear el evento en Google Calendar primero
     let meetLink = null;
     let googleEventId = null;
 
-    if (eventDetails.eventType === 'meeting') {
+    if (eventDetails.eventType === "meeting") {
       try {
         const googleEvent = await createGoogleEvent({
           title: eventDetails.title,
@@ -29,24 +28,21 @@ async function createEvent(eventDetails) {
 
         meetLink = googleEvent.meetLink;
         googleEventId = googleEvent.googleEventId;
-        console.log("Evento de Google creado:", { meetLink, googleEventId });
       } catch (error) {
         console.error("Error al crear evento en Google:", error);
         throw new Error("No se pudo crear el evento en Google Calendar");
       }
     }
 
-    // Formatear fechas para MySQL
     const formattedStartDate = new Date(eventDetails.startDateTime)
       .toISOString()
       .slice(0, 19)
-      .replace('T', ' ');
+      .replace("T", " ");
     const formattedEndDate = new Date(eventDetails.endDateTime)
       .toISOString()
       .slice(0, 19)
-      .replace('T', ' ');
+      .replace("T", " ");
 
-    // Insertar en la base de datos
     const [result] = await connection.query(
       `INSERT INTO events (
         title, 
@@ -55,7 +51,7 @@ async function createEvent(eventDetails) {
         event_type, 
         meet_link, 
         created_by, 
-        client_id, 
+        client_id,
         google_event_id
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -70,61 +66,53 @@ async function createEvent(eventDetails) {
       ]
     );
 
-    // Obtener información del cliente para el correo
-    const [clientInfo] = await connection.query(
-      `SELECT c.*, u.correo_electronico 
-       FROM cliente c 
-       JOIN usuario u ON c.id_usuario = u.id_usuario 
-       WHERE c.id_cliente = ?`,
-      [eventDetails.clientId]
-    );
-
-    if (clientInfo.length > 0 && eventDetails.eventType === 'meeting') {
-      // Enviar correo de confirmación
-      const startDate = new Date(eventDetails.startDateTime);
-      await enviarConfirmacionCita({
-        to: clientInfo[0].correo_electronico,
-        eventDate: startDate.toLocaleDateString('es-MX', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
-        eventTime: startDate.toLocaleTimeString('es-MX', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        }),
-        link: meetLink
-      });
-    }
-
-    const savedEvent = {
+    return {
       id: result.insertId,
       title: eventDetails.title,
       start: formattedStartDate,
       end: formattedEndDate,
       eventType: eventDetails.eventType,
+      clientId: eventDetails.clientId,
       meetLink,
       createdBy: eventDetails.createdBy,
-      clientId: eventDetails.clientId,
       googleEventId
     };
-
-    return savedEvent;
-
   } catch (error) {
     console.error("Error al crear evento:", error);
     throw error;
   }
 }
 
+const getAdvisors = async () => {
+  const connection = getConnection();
+  try {
+    const [advisors] = await connection.query(
+      `SELECT 
+        u.id_usuario as id,
+        u.correo_electronico as email,
+        a.nombre_completo as name
+      FROM usuario u
+      JOIN asesor a ON u.id_usuario = a.id_usuario
+      WHERE u.tipo_usuario = 'asesor'
+      ORDER BY a.nombre_completo ASC`
+    );
+    console.log(advisors);
+    return advisors;
+  } catch (error) {
+    console.error("Error al obtener asesores:", error);
+    throw new Error("Error al obtener la lista de asesores");
+  }
+};
+
 const getClientsByAdvisor = async (advisorId) => {
   const connection = getConnection();
 
   try {
     const [clients] = await connection.query(
-      `SELECT * FROM cliente c
+      `SELECT 
+        c.*,
+        u.correo_electronico
+      FROM cliente c
       JOIN usuario u ON c.id_usuario = u.id_usuario
       WHERE c.id_asesor = ?
       ORDER BY c.nombre_completo ASC`,
@@ -137,74 +125,138 @@ const getClientsByAdvisor = async (advisorId) => {
     throw new Error("Error al obtener los clientes del asesor");
   }
 };
+
+// Nueva función para obtener todos los clientes (para promotores)
+const getAllClients = async () => {
+  const connection = getConnection();
+
+  try {
+    const [clients] = await connection.query(
+      `SELECT 
+        c.*,
+        u.correo_electronico,
+        u2.correo_electronico as correo_asesor
+       FROM cliente c
+       JOIN usuario u ON c.id_usuario = u.id_usuario
+       LEFT JOIN usuario u2 ON c.id_asesor = u2.id_usuario
+       ORDER BY c.nombre_completo ASC`
+    );
+
+    return clients;
+  } catch (error) {
+    console.error("Error al obtener todos los clientes:", error);
+    throw new Error("Error al obtener la lista completa de clientes");
+  }
+};
+
+const getClientsByUserType = async (userId) => {
+  const connection = getConnection();
+
+  try {
+    // Verificar el tipo de usuario
+    const [userType] = await connection.query(
+      `SELECT tipo_usuario FROM usuario WHERE id_usuario = ?`,
+      [userId]
+    );
+
+    if (!userType.length) {
+      throw new Error("Usuario no encontrado");
+    }
+
+    // Si es promotor, obtener todos los clientes
+    if (userType[0].tipo_usuario === "promotor/administrador") {
+      return await getAllClients();
+    }
+
+    // Si es asesor, obtener solo sus clientes
+    return await getClientsByAdvisor(userId);
+  } catch (error) {
+    console.error("Error al obtener clientes:", error);
+    throw new Error("Error al obtener los clientes");
+  }
+};
+
 /**
  * Obtener eventos de un usuario (cliente o asesor)
  */
+
 const getEventsByUser = async (userId) => {
   const connection = getConnection();
 
-  // Primero verificamos el tipo de usuario
-  const userTypeQuery = `
-        SELECT tipo_usuario 
-        FROM usuario 
-        WHERE id_usuario = ?`;
+  try {
+    const [userType] = await connection.query(
+      'SELECT tipo_usuario FROM usuario WHERE id_usuario = ?',
+      [userId]
+    );
 
-  const [userType] = await connection.query(userTypeQuery, [userId]);
-
-  // Si es promotor, obtener todos los eventos
-  if (userType[0]?.tipo_usuario === "promotor/administrador") {
-    const query = `
-            SELECT DISTINCT e.id, e.title, e.start_datetime AS start, e.end_datetime AS end
-            FROM events e
-            LEFT JOIN usuario u ON e.created_by = u.id_usuario
-            WHERE e.created_by = ?  -- Eventos creados por el promotor
-            OR (EXISTS (          -- Eventos creados por asesores
-                SELECT 1 
-                FROM usuario u2 
-                WHERE u2.id_usuario = e.created_by 
-                AND u2.tipo_usuario = 'asesor' OR u2.tipo_usuario = 'cliente'
-            ))
-        `;
-    const [rows] = await connection.query(query, [userId]);
-    return rows;
-  }
-  // Si es asesor o cliente, mantener la lógica original
-  else {
-    const query = `
-            SELECT id, title, start_datetime AS start, end_datetime AS end
-            FROM events
-            WHERE created_by = ? OR client_id = ?
-        `;
-    const [rows] = await connection.query(query, [userId, userId]);
-    return rows;
+    if (userType[0]?.tipo_usuario === "promotor/administrador") {
+      const query = `
+        SELECT 
+          events.id, 
+          events.title, 
+          events.start_datetime as start, 
+          events.end_datetime as end,
+          events.event_type,
+          events.client_id,
+          u.tipo_usuario,
+          CASE 
+            WHEN u.tipo_usuario = 'asesor' THEN 'advisor'
+            WHEN u.tipo_usuario = 'cliente' THEN 'client'
+            ELSE 'both'
+          END as attendee_type
+        FROM events
+        LEFT JOIN usuario u ON events.client_id = u.id_usuario
+        WHERE events.created_by = ?
+        OR (EXISTS (
+          SELECT 1 
+          FROM usuario u2 
+          WHERE u2.id_usuario = events.created_by
+          AND (u2.tipo_usuario = 'asesor' OR u2.tipo_usuario = 'cliente')
+        ))
+      `;
+      const [rows] = await connection.query(query, [userId]);
+      return rows;
+    } else {
+      const query = `
+        SELECT 
+          id, 
+          title, 
+          start_datetime as start, 
+          end_datetime as end,
+          event_type,
+          client_id
+        FROM events
+        WHERE created_by = ? OR client_id = ?
+      `;
+      const [rows] = await connection.query(query, [userId, userId]);
+      return rows;
+    }
+  } catch (error) {
+    console.error("Error al obtener eventos:", error);
+    throw error;
   }
 };
+
 /**
  * Actualizar un evento en la base de datos y en Google Calendar
  */
 async function updateEvent(eventId, eventDetails) {
   const connection = getConnection();
-  console.log("Actualizando evento:", { eventId, eventDetails });
-
   try {
-    // Formatear fechas para MySQL
     const formattedStartDate = new Date(eventDetails.startDateTime)
       .toISOString()
       .slice(0, 19)
-      .replace('T', ' ');
+      .replace("T", " ");
     const formattedEndDate = new Date(eventDetails.endDateTime)
       .toISOString()
       .slice(0, 19)
-      .replace('T', ' ');
+      .replace("T", " ");
 
-    // Verificar si el evento existe
-    const [existingEvent] = await connection.query(
-      'SELECT * FROM events WHERE id = ?',
-      [eventId]
-    );
-
-    if (existingEvent.length === 0) {
-      throw new Error('Evento no encontrado');
+    let clientId = null;
+    if (["client", "both"].includes(eventDetails.attendeeType)) {
+      clientId = eventDetails.clientId;
+    } else if (eventDetails.attendeeType === "advisor") {
+      clientId = eventDetails.advisorId;
     }
 
     const [result] = await connection.query(
@@ -213,30 +265,31 @@ async function updateEvent(eventId, eventDetails) {
         start_datetime = ?,
         end_datetime = ?,
         event_type = ?,
-        meet_link = ?
+        meet_link = ?,
+        client_id = ?
       WHERE id = ?`,
       [
         eventDetails.title,
         formattedStartDate,
         formattedEndDate,
         eventDetails.eventType,
-        eventDetails.meetLink || null,
-        eventId
+        eventDetails.meetLink,
+        clientId,
+        eventId,
       ]
     );
 
     if (result.affectedRows === 0) {
-      throw new Error('No se pudo actualizar el evento');
+      throw new Error("No se pudo actualizar el evento");
     }
 
-    // Devolver el evento actualizado
     return {
       id: eventId,
       ...eventDetails,
       start: formattedStartDate,
-      end: formattedEndDate
+      end: formattedEndDate,
+      clientId,
     };
-
   } catch (error) {
     console.error("Error al actualizar evento:", error);
     throw error;
@@ -254,34 +307,31 @@ async function deleteEvent(eventId) {
   try {
     // Verificar si el evento existe
     const [existingEvent] = await connection.query(
-      'SELECT * FROM events WHERE id = ?',
+      "SELECT * FROM events WHERE id = ?",
       [eventId]
     );
 
     if (existingEvent.length === 0) {
-      throw new Error('Evento no encontrado');
+      throw new Error("Evento no encontrado");
     }
 
-    const [result] = await connection.query(
-      'DELETE FROM events WHERE id = ?',
-      [eventId]
-    );
+    const [result] = await connection.query("DELETE FROM events WHERE id = ?", [
+      eventId,
+    ]);
 
     if (result.affectedRows === 0) {
-      throw new Error('No se pudo eliminar el evento');
+      throw new Error("No se pudo eliminar el evento");
     }
 
     return {
       success: true,
-      message: 'Evento eliminado correctamente'
+      message: "Evento eliminado correctamente",
     };
-
   } catch (error) {
     console.error("Error al eliminar evento:", error);
     throw error;
   }
 }
-
 
 /**
  * Obtener eventos programados para las próximas 24 horas
@@ -302,4 +352,7 @@ module.exports = {
   updateEvent,
   deleteEvent,
   obtenerEventosProximos24Horas,
+  getAdvisors,
+  getClientsByUserType,
+  getAllClients,
 };

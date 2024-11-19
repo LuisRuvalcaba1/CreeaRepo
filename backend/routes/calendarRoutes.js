@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createEvent, updateEvent, deleteEvent, getEventsByUser, getClientsByAdvisor, blockTimeInterval, getUpcomingBirthdays } = require('../services/eventService'); // Servicio para la base de datos
+const { createEvent, updateEvent, deleteEvent, getEventsByUser, getClientsByUserType, getAdvisors, blockTimeInterval, getUpcomingBirthdays } = require('../services/eventService'); // Servicio para la base de datos
 const { createGoogleEvent, updateGoogleEvent, deleteGoogleEvent } = require('../services/googleCalendarService'); // Servicio para Google Calendar
 const { enviarConfirmacionCita, enviarCorreoCancelacion } = require('../services/emailService'); // Servicio de correos
 const cron = require('node-cron');
@@ -17,8 +17,9 @@ router.post('/create-event', async (req, res) => {
       eventType: req.body.eventType || 'event',
       createdBy: req.body.createdBy,
       clientId: req.body.clientId,
-      meetLink: req.body.meetLink,
-      googleEventId: req.body.googleEventId
+      advisorId: req.body.advisorId,
+      attendeeType: req.body.attendeeType || 'client',
+      attendees: req.body.attendees || []
     };
 
     const savedEvent = await createEvent(eventDetails);
@@ -36,6 +37,16 @@ router.post('/create-event', async (req, res) => {
   }
 });
 
+router.get('/advisors', async (req, res) => {
+  try {
+    const advisors = await getAdvisors();
+    res.status(200).json(advisors);
+  } catch (error) {
+    console.error('Error al obtener asesores:', error);
+    res.status(500).json({ error: 'Error al obtener la lista de asesores.' });
+  }
+});
+
 router.get('/get-clients-asesor', async (req, res) => {
   const { advisorId } = req.query;
 
@@ -44,9 +55,11 @@ router.get('/get-clients-asesor', async (req, res) => {
   }
 
   try {
-    const clients = await getClientsByAdvisor(advisorId);
+    const clients = await getClientsByUserType(advisorId);
     if (!clients || clients.length === 0) {
-      return res.status(404).json({ message: 'No se encontraron clientes para este asesor.' });
+      return res.status(404).json({ 
+        message: 'No se encontraron clientes.' 
+      });
     }
     res.status(200).json(clients);
   } catch (error) {
@@ -54,7 +67,6 @@ router.get('/get-clients-asesor', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener clientes.' });
   }
 });
-
 // Obtener eventos por asesor
 router.get('/get-events', async (req, res) => {
   const { advisorId } = req.query;
@@ -64,9 +76,9 @@ router.get('/get-events', async (req, res) => {
   }
 
   try {
-    const events = await getEventsByUser(advisorId); // Función en eventService para obtener eventos
+    const events = await getEventsByUser(advisorId);
     if (!events || events.length === 0) {
-      return res.status(404).json({ message: 'No se encontraron eventos para este asesor.' });
+      return res.status(404).json({ message: 'No se encontraron eventos.' });
     }
     res.status(200).json(events);
   } catch (error) {
@@ -74,25 +86,6 @@ router.get('/get-events', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener eventos.' });
   }
 });
-
-// router.get('/get-clients-promotor', async (req, res) => {
-//   const { promotorID } = req.query;
-
-//   if (!promotorID) {
-//     return res.status(400).json({ error: 'Falta el parámetro promotorID' });
-//   }
-
-//   try {
-//     const clients = await getClientsByAdvisor(promotorID); // Función en eventService para obtener eventos
-//     if (!clients || clients.length === 0) {
-//       return res.status(404).json({ message: 'No se encontraron clientes para este asesor.' });
-//     }
-//     res.status(200).json(clients);
-//   } catch (error) {
-//     console.error('Error al obtener clientes:', error);
-//     res.status(500).json({ error: 'Error al obtener clientes.' });
-//   }
-// });
 
 router.get('/get-events-promotor', async (req, res) => {
   const { promotorID } = req.query;
@@ -128,6 +121,9 @@ router.put('/update-event/:eventId', async (req, res) => {
       startDateTime: req.body.startDateTime,
       endDateTime: req.body.endDateTime,
       eventType: req.body.eventType || 'event',
+      clientId: req.body.clientId,
+      advisorId: req.body.advisorId,
+      attendeeType: req.body.attendeeType || 'client',
       meetLink: req.body.meetLink
     };
 
@@ -145,6 +141,7 @@ router.put('/update-event/:eventId', async (req, res) => {
     });
   }
 });
+
 
 // Obtener eventos para un usuario
 router.get('/events', async (req, res) => {
@@ -165,6 +162,7 @@ router.get('/events', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener eventos.' });
   }
 });
+
 // Eliminar un evento y enviar correo de cancelación
 router.delete('/delete-event/:eventId', async (req, res) => {
   const { eventId } = req.params;
@@ -200,6 +198,7 @@ router.post('/block-interval', async (req, res) => {
     res.status(500).json({ error: 'Error al bloquear intervalo de tiempo.' });
   }
 });
+
 // Programar cron job para recordatorios de cumpleaños
 cron.schedule('0 9 * * *', async () => {
   try {

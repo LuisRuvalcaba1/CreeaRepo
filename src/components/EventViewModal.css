@@ -1,0 +1,156 @@
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  
+  .modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    position: relative;
+    animation: slideIn 0.3s ease-out;
+  }
+  
+  @keyframes slideIn {
+    from {
+      transform: translateY(-20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  .modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .event-type-badge {
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-weight: 500;
+    font-size: 0.9em;
+  }
+  
+  .meeting-type {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+  }
+  
+  .event-type {
+    background-color: #e3f2fd;
+    color: #1565c0;
+  }
+  
+  .close-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    margin: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  
+  .close-button:hover {
+    background-color: #f5f5f5;
+  }
+  
+  .modal-body {
+    padding: 20px;
+  }
+  
+  .modal-body h2 {
+    margin: 0 0 20px 0;
+    color: #333;
+  }
+  
+  .event-details {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .detail-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .detail-icon {
+    font-size: 20px;
+    width: 24px;
+    text-align: center;
+  }
+  
+  .detail-content {
+    flex: 1;
+  }
+  
+  .detail-content strong {
+    display: block;
+    margin-bottom: 4px;
+    color: #666;
+  }
+  
+  .detail-content p {
+    margin: 0;
+    color: #333;
+  }
+  
+  .meet-link {
+    display: inline-block;
+    padding: 8px 16px;
+    background-color: #1a73e8;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    margin-top: 4px;
+    transition: background-color 0.3s;
+  }
+  
+  .meet-link:hover {
+    background-color: #1557b0;
+  }
+  
+  .modal-footer {
+    padding: 20px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .close-modal-button {
+    padding: 8px 16px;
+    background-color: #f5f5f5;
+    border: none;
+    border-radius: 4px;
+    color: #333;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  
+  .close-modal-button:hover {
+    background-color: #e0e0e0;
+  }

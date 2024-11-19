@@ -78,6 +78,24 @@
     box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
 }
 
+.rbc-event-asesor {
+    background-color: #2ca732; /* Amarillo Canario para eventos */
+    color: #01274D;
+    border-radius: 5px;
+    padding: 4px;
+    font-weight: bold;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.rbc-event-both {
+    background-color: #ff0000; /* Amarillo Canario para eventos */
+    color: #ffffff;
+    border-radius: 5px;
+    padding: 4px;
+    font-weight: bold;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+}
+
 .rbc-event:hover {
     background-color: #337BC2;
     color: #ffffff;

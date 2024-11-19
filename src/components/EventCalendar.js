@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Calendar, momentLocalizer } from 'react-big-calendar';
-import moment from 'moment';
-import EventFormModal from './EventFormModal';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
-import './EventCalendar.css';
+import React, { useState } from "react";
+import { Calendar, momentLocalizer } from "react-big-calendar";
+import moment from "moment";
+import EventFormModal from "./EventFormModal";
+import "react-big-calendar/lib/css/react-big-calendar.css";
+import "./EventCalendar.css";
 
 const localizer = momentLocalizer(moment);
 
@@ -11,6 +11,25 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete }) => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showEventForm, setShowEventForm] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
+
+  const eventStyleGetter = (event) => {
+    let className = "";
+
+    switch (event.event_type) {
+      case "advisor":
+        className = "rbc-event-asesor";
+        break;
+      case "both":
+        className = "rbc-event-both";
+        break;
+      default:
+        className = "rbc-event";
+    }
+
+    return {
+      className: className,
+    };
+  };
 
   const handleSelectSlot = ({ start }) => {
     setSelectedDate(start);
@@ -34,9 +53,8 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete }) => {
   };
 
   const handleDeleteEvent = (event) => {
-    // Solo llamar a onEventDelete y cerrar el modal
-    if (event && event.id) {
-      onEventDelete(event);
+    if (event) {
+      onEventDelete(event.id || event);
       setShowEventForm(false);
       setSelectedEvent(null);
     }
@@ -53,6 +71,7 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete }) => {
         selectable
         onSelectSlot={handleSelectSlot}
         onSelectEvent={handleSelectEvent}
+        eventPropGetter={eventStyleGetter}
       />
 
       {showEventForm && (

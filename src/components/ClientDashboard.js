@@ -2,94 +2,87 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
-import EventCalendar from './EventCalendar'; 
 import axios from 'axios';
+import moment from 'moment';
+import { Calendar, momentLocalizer } from 'react-big-calendar';
+import EventViewModal from './EventViewModal';
 import './ClientDashboard.css';
+
+const localizer = momentLocalizer(moment);
 
 const ClientDashboard = () => {
   const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [showEventModal, setShowEventModal] = useState(false);
   const [insuranceInfo, setInsuranceInfo] = useState([]);
   const [nextRenewal, setNextRenewal] = useState('');
   const [payments, setPayments] = useState([]);
   const [exchangeRates, setExchangeRates] = useState({});
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [conflictError, setConflictError] = useState('');
-  
   const navigate = useNavigate();
 
-  useEffect(() => {
-  const userId = sessionStorage.getItem('userId');
-  axios.get(`/api/calendar/events?userId=${userId}`)
-    .then((response) => {
-      setEvents(response.data.map(event => ({
-        id: event.id,
-        title: event.title,
-        start: new Date(event.start_datetime),
-        end: new Date(event.end_datetime),
-        link: event.meet_link || '',
-      })));
-    })
-    .catch((error) => {
+  const fetchEvents = async () => {
+    const userId = sessionStorage.getItem('userId');
+    try {
+      const response = await axios.get(`/api/calendar/get-events?advisorId=${userId}`);
+      if (response.data && response.data.length > 0) {
+        setEvents(response.data.map(event => ({
+          id: event.id,
+          title: event.title,
+          start: new Date(event.start),
+          end: new Date(event.end),
+          clientId: event.client_id,
+          eventType: event.event_type,
+          meetLink: event.meet_link || '',
+          createdBy: event.created_by
+        })));
+      }
+    } catch (error) {
       console.error('Error al cargar eventos:', error);
-    });
-    // Datos simulados de seguros, pagos y renovación
+    }
+  };
+
+   useEffect(() => {
+    fetchEvents();
+    
     setInsuranceInfo([{ policy: 'Orvi 99', details: 'Cubre fallecimiento y accidentes.' }]);
     setNextRenewal('2025-01-15');
-    setPayments([{ date: '2024-09-01', amount: '500 MXN' }, { date: '2024-08-01', amount: '500 MXN' }]);
-
-    // Llamada API para obtener tipo de cambio (ejemplo)
-    axios.get('https://api.exchangerate-api.com/v4/latest/USD')
-    .then((response) => {
-        setExchangeRates({ usd: response.data.rates.MXN, udi: 6.57 });
-    });
-
-    // Inicializamos algunos eventos
-    setEvents([
-      { id: 1, title: 'Reunión con asesor', start: new Date('2024-09-10T10:00'), end: new Date('2024-09-10T11:00'), link: 'https://meet.google.com' },
-      { id: 2, title: 'Renovación de seguro', start: new Date('2024-10-05T14:00'), end: new Date('2024-10-05T15:00'), link: '' }
+    setPayments([
+      { date: '2024-09-01', amount: '500 MXN' },
+      { date: '2024-08-01', amount: '500 MXN' }
     ]);
+
+    axios.get('https://api.exchangerate-api.com/v4/latest/USD')
+      .then((response) => {
+        setExchangeRates({ usd: response.data.rates.MXN, udi: 6.57 });
+      })
+      .catch(error => {
+        console.error('Error al obtener tipos de cambio:', error);
+        setExchangeRates({ usd: 20.5, udi: 6.57 });
+      });
   }, []);
 
-  // Validación de conflictos de eventos
-  const validateEventConflict = (newEvent) => {
-    return events.some(event => event.start.toISOString() === newEvent.start.toISOString());
-  };
 
-  // Función para guardar un nuevo evento
-  const handleSaveEvent = (eventData) => {
-    const newEvent = {
-      id: events.length + 1,
-      title: eventData.title,
-      start: eventData.start,
-      end: eventData.end,
-      link: eventData.link,
-    };
-
-    if (validateEventConflict(newEvent)) {
-      setConflictError('Ya tienes un evento programado para esa fecha y hora.');
-      return;
-    }
-
-    setEvents([...events, newEvent]);
-    setShowConfirmation(true);
-  };
-
-  const handleEditEvent = (updatedEvent) => {
-    setEvents((prevEvents) =>
-      prevEvents.map((event) => event.id === updatedEvent.id ? updatedEvent : event)
-    );
-    setShowConfirmation(true);
-  };
-
-  const handleDeleteEvent = (eventToDelete) => {
-    setEvents((prevEvents) => prevEvents.filter((event) => event.id !== eventToDelete.id));
-    setShowConfirmation(true);
-  };
-
-  // Función para manejar el clic en un pago pendiente
   const handlePaymentClick = (payment) => {
     navigate('/payment', { state: { amount: payment.amount, date: payment.date } });
   };
+
+  const eventStyleGetter = (event) => {
+    let className = "";
+    switch (event.eventType) {
+      case "meeting":
+        className = "rbc-event-meeting";
+        break;
+      default:
+        className = "rbc-event-regular";
+    }
+    return { className };
+  };
+
+  const handleSelectEvent = (event) => {
+    setSelectedEvent(event);
+    setShowEventModal(true);
+  };
+
 
   return (
     <div className="client-dashboard">
@@ -97,7 +90,6 @@ const ClientDashboard = () => {
 
       <div className="client-main-content">
         <div className="client-grid">
-
           {/* Productos */}
           <div className="client-section products-section">
             <h2>Productos</h2>
@@ -142,23 +134,30 @@ const ClientDashboard = () => {
           {/* Tipo de Cambio */}
           <div className="client-section exchange-rate-section">
             <h2>Tipo de Cambio</h2>
-            <p>Dólar: {exchangeRates.usd} MXN</p>
-            <p>UDI: {exchangeRates.udi} MXN</p>
+            <p>Dólar: {exchangeRates.usd?.toFixed(2)} MXN</p>
+            <p>UDI: {exchangeRates.udi?.toFixed(2)} MXN</p>
           </div>
 
           {/* Calendario */}
           <div className="client-section calendar-section">
-            <h2>Calendario</h2>
-            <EventCalendar
+            <h2>Calendario de Eventos</h2>
+            <Calendar
+              localizer={localizer}
               events={events}
-              onEventAdd={handleSaveEvent}
-              onEventEdit={handleEditEvent}
-              onEventDelete={handleDeleteEvent}
+              startAccessor="start"
+              endAccessor="end"
+              style={{ height: 500 }}
+              onSelectEvent={handleSelectEvent}
+              eventPropGetter={eventStyleGetter}
+              selectable={false}
+              toolbar={true}
             />
 
-            {/* Mostrar confirmación o errores */}
-            {showConfirmation && <p>¡Evento guardado exitosamente!</p>}
-            {conflictError && <p style={{ color: 'red' }}>{conflictError}</p>}
+            <EventViewModal
+              show={showEventModal}
+              onClose={() => setShowEventModal(false)}
+              eventData={selectedEvent}
+            />
           </div>
 
           {/* Calculadora de Riesgo */}

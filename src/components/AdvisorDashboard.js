@@ -220,15 +220,20 @@ const AdvisorDashboard = () => {
     }
   };
 
-  const handleEventDelete = async (event) => {
-    if (isDeleting || !event?.id) return;
+  const handleEventDelete = async (eventId) => {
+    if (isDeleting || !eventId) return;
     
     try {
       setIsDeleting(true);
-      await axios.delete(`/api/calendar/delete-event/${event.id}`);
+      console.log('Eliminando evento con ID:', eventId); // Para debugging
+      
+      await axios.delete(`/api/calendar/delete-event/${eventId}`);
       
       // Actualizar el estado local después de eliminar exitosamente
-      setEvents(prevEvents => prevEvents.filter(e => e.id !== event.id));
+      setEvents(prevEvents => prevEvents.filter(e => e.id !== eventId));
+      
+      // Mostrar confirmación al usuario
+      alert('Evento eliminado exitosamente');
     } catch (error) {
       console.error('Error al eliminar evento:', error);
       alert('Error al eliminar el evento');

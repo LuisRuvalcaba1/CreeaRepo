@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const PromoterDashboard = () => {
+  const navigate = useNavigate();
   const [advisors, setAdvisors] = useState([]);
   const [expandedAdvisor, setExpandedAdvisor] = useState(null);
   const [events, setEvents] = useState([]);
@@ -21,60 +22,79 @@ const PromoterDashboard = () => {
     title: "",
     startDateTime: "",
     endDateTime: "",
+    eventType: "event",
+    attendeeType: "both",
   });
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
+  const [selectedAdvisor, setSelectedAdvisor] = useState(null);
+  const [activeAdvisors, setActiveAdvisors] = useState([]);
 
-  // Añade este useEffect para cargar los clientes
   useEffect(() => {
-    // Cargar la lista de clientes
-    const fetchClients = async () => {
+    const fetchData = async () => {
       try {
-        const response = await axios.get("/api/clients");
-        setClients(response.data);
+        // Cargar clientes
+        const clientsResponse = await axios.get(
+          `/api/calendar/get-clients-asesor?advisorId=${promotorID}`
+        );
+        setClients(
+          Array.isArray(clientsResponse.data) ? clientsResponse.data : []
+        );
+
+        // Cargar asesores activos
+        const advisorsResponse = await axios.get("/api/calendar/advisors");
+        setActiveAdvisors(
+          Array.isArray(advisorsResponse.data) ? advisorsResponse.data : []
+        );
+
+        // Cargar asesores con sus clientes para el panel lateral
+        const advisorsWithClientsResponse = await axios.get(
+          "/api/advisors-with-clients"
+        );
+        setAdvisors(
+          Array.isArray(advisorsWithClientsResponse.data)
+            ? advisorsWithClientsResponse.data
+            : []
+        );
+
+        // Cargar tipo de cambio
+        const exchangeResponse = await axios.get(
+          "https://api.exchangerate-api.com/v4/latest/USD"
+        );
+        setExchangeRates({
+          usd: exchangeResponse.data.rates.MXN,
+          udi: 6.57,
+        });
       } catch (error) {
-        console.error("Error al cargar clientes:", error);
+        console.error("Error al cargar datos:", error);
+        // Manejar errores específicos si es necesario
       }
     };
-    fetchClients();
-  }, []);
 
-  useEffect(() => {
+    fetchData();
     fetchEvents();
   }, [promotorID]);
-
-  useEffect(() => {
-    axios
-      .get("/api/advisors-with-clients")
-      .then((response) => {
-        setAdvisors(response.data);
-      })
-      .catch((error) => {
-        console.error("Error al obtener la lista de asesores:", error);
-      });
-
-    axios
-      .get("https://api.exchangerate-api.com/v4/latest/USD")
-      .then((response) => {
-        setExchangeRates({ usd: response.data.rates.MXN, udi: 6.57 });
-      });
-  }, []);
 
   const fetchEvents = async () => {
     try {
       const response = await axios.get(
-        `/api/get-events?advisorId=${promotorID}`
+        `/api/calendar/get-events?advisorId=${promotorID}`
       );
-      const formattedEvents = response.data.map((event) => ({
-        id: event.id,
-        title: event.title,
-        start: new Date(event.startDateTime || event.start),
-        end: new Date(event.endDateTime || event.end),
-        clientId: event.clientId,
-      }));
-      setEvents(formattedEvents);
+      if (response.data && Array.isArray(response.data)) {
+        const formattedEvents = response.data.map((event) => ({
+          id: event.id,
+          title: event.title,
+          start: new Date(event.start),
+          end: new Date(event.end),
+          clientId: event.client_id,
+          eventType: event.event_type,
+          attendeeType: event.attendee_type,
+        }));
+        setEvents(formattedEvents);
+      }
     } catch (error) {
       console.error("Error al obtener eventos:", error);
+      setEvents([]);
     }
   };
 
@@ -84,6 +104,8 @@ const PromoterDashboard = () => {
       title: event.title,
       startDateTime: event.start.toISOString().slice(0, 16),
       endDateTime: event.end.toISOString().slice(0, 16),
+      eventType: event.eventType || "event",
+      attendeeType: event.attendeeType || "both",
     });
     setIsModalOpen(true);
   };
@@ -94,74 +116,166 @@ const PromoterDashboard = () => {
       title: "",
       startDateTime: "",
       endDateTime: "",
+      eventType: "event",
+      attendeeType: "both",
     });
+    setSelectedClient(null);
+    setSelectedAdvisor(null);
     setIsModalOpen(true);
   };
 
   const handleSaveEvent = async () => {
-    if (
-      !meetingDetails.title ||
-      !meetingDetails.startDateTime ||
-      !meetingDetails.endDateTime ||
-      !selectedClient
-    ) {
-      alert(
-        "Por favor, complete todos los campos requeridos, incluyendo la selección del cliente."
-      );
+    if (!meetingDetails.title || !meetingDetails.startDateTime || !meetingDetails.endDateTime) {
+      alert("Por favor, complete todos los campos obligatorios.");
+      return;
+    }
+
+    // Validaciones según el tipo de asistentes
+    if (meetingDetails.attendeeType === "both" && (!selectedClient || !selectedAdvisor)) {
+      alert("Por favor, seleccione tanto cliente como asesor.");
+      return;
+    } else if (meetingDetails.attendeeType === "client" && !selectedClient) {
+      alert("Por favor, seleccione un cliente.");
+      return;
+    } else if (meetingDetails.attendeeType === "advisor" && !selectedAdvisor) {
+      alert("Por favor, seleccione un asesor.");
       return;
     }
 
     try {
-      const eventData = {
-        title: meetingDetails.title,
-        startDateTime: meetingDetails.startDateTime,
-        endDateTime: meetingDetails.endDateTime,
-        eventType: "meeting",
-        createdBy: promotorID,
-        clientId: selectedClient.id_cliente, // Asegúrate de incluir el clientId
-        description: meetingDetails.description || "",
-        attendees: [{ email: selectedClient.correo_electronico }], // Si tienes el correo del cliente
-      };
+      let eventData;
+
+      switch (meetingDetails.attendeeType) {
+        case "both":
+          // Crear dos eventos separados: uno para el cliente y otro para el asesor
+          eventData = {
+            title: meetingDetails.title,
+            startDateTime: meetingDetails.startDateTime,
+            endDateTime: meetingDetails.endDateTime,
+            eventType: meetingDetails.eventType,
+            createdBy: promotorID,
+            attendeeType: meetingDetails.attendeeType,
+            events: [
+              {
+                clientId: selectedClient.id_cliente,
+                email: selectedClient.correo_electronico,
+                type: 'client'
+              },
+              {
+                clientId: selectedAdvisor.id,
+                email: selectedAdvisor.email,
+                type: 'advisor'
+              }
+            ]
+          };
+          break;
+
+        case "client":
+          eventData = {
+            title: meetingDetails.title,
+            startDateTime: meetingDetails.startDateTime,
+            endDateTime: meetingDetails.endDateTime,
+            eventType: meetingDetails.eventType,
+            createdBy: promotorID,
+            attendeeType: meetingDetails.attendeeType,
+            events: [
+              {
+                clientId: selectedClient.id_cliente,
+                email: selectedClient.correo_electronico,
+                type: 'client'
+              }
+            ]
+          };
+          break;
+
+        case "advisor":
+          eventData = {
+            title: meetingDetails.title,
+            startDateTime: meetingDetails.startDateTime,
+            endDateTime: meetingDetails.endDateTime,
+            eventType: meetingDetails.eventType,
+            createdBy: promotorID,
+            attendeeType: meetingDetails.attendeeType,
+            events: [
+              {
+                clientId: selectedAdvisor.id,
+                email: selectedAdvisor.email,
+                type: 'advisor'
+              }
+            ]
+          };
+          break;
+
+        case "all":
+          // Este caso requerirá una lógica especial en el backend para obtener todos los usuarios
+          eventData = {
+            title: meetingDetails.title,
+            startDateTime: meetingDetails.startDateTime,
+            endDateTime: meetingDetails.endDateTime,
+            eventType: meetingDetails.eventType,
+            createdBy: promotorID,
+            attendeeType: "all"
+          };
+          break;
+
+        default:
+          throw new Error("Tipo de asistentes no válido");
+      }
 
       if (selectedEvent) {
-        // Actualizar evento existente
-        await axios.put(
-          `/api/calendar/update-event/${selectedEvent.id}`,
-          eventData
-        );
+        await axios.put(`/api/calendar/update-event/${selectedEvent.id}`, eventData);
         alert("Evento actualizado exitosamente.");
       } else {
-        // Crear nuevo evento
         await axios.post("/api/calendar/create-event", eventData);
         alert("Evento creado exitosamente.");
       }
 
-      await fetchEvents(); // Recargar eventos
+      await fetchEvents();
       setIsModalOpen(false);
-      setSelectedEvent(null);
-      setSelectedClient(null);
+      resetForm();
     } catch (error) {
       console.error("Error al guardar el evento:", error);
-      alert(
-        "Error al guardar el evento: " +
-          (error.response?.data?.error || error.message)
-      );
+      alert("Error al guardar el evento: " + (error.response?.data?.error || error.message));
     }
   };
 
+  const resetForm = () => {
+    setSelectedEvent(null);
+    setSelectedClient(null);
+    setSelectedAdvisor(null);
+    setMeetingDetails({
+      title: "",
+      startDateTime: "",
+      endDateTime: "",
+      eventType: "event",
+      attendeeType: "both",
+    });
+  };
+
   const handleDeleteEvent = async (eventId) => {
+    // Si recibimos un objeto en lugar de un ID, extraemos el ID
+    const id = typeof eventId === 'object' ? eventId.id : eventId;
+    
+    if (!id) {
+      console.error('No se pudo obtener el ID del evento');
+      alert('Error al eliminar el evento: ID no válido');
+      return;
+    }
+  
     if (window.confirm("¿Está seguro de que desea eliminar este evento?")) {
       try {
-        await axios.delete(`/api/calendar/delete-event/${eventId}`);
+        await axios.delete(`/api/calendar/delete-event/${id}`);
         await fetchEvents(); // Recargar eventos
         setIsModalOpen(false);
         setSelectedEvent(null);
+        setSelectedClient(null);
+        setSelectedAdvisor(null);
       } catch (error) {
         console.error("Error al eliminar el evento:", error);
         alert("Error al eliminar el evento");
       }
     }
-  };
+  };  
 
   const toggleExpandAdvisor = (id) => {
     setExpandedAdvisor(expandedAdvisor === id ? null : id);
@@ -224,21 +338,23 @@ const PromoterDashboard = () => {
 
           <div className="advisors-section container">
             <h2>Asesores</h2>
-            {advisors.map((advisor) => (
-              <div key={advisor.id} className="advisor">
-                <div onClick={() => toggleExpandAdvisor(advisor.id)}>
-                  <span className="bold">{advisor.name}</span> -{" "}
-                  {advisor.agentNumber}
+            {Array.isArray(advisors) &&
+              advisors.map((advisor) => (
+                <div key={advisor.id} className="advisor">
+                  <div onClick={() => toggleExpandAdvisor(advisor.id)}>
+                    <span className="bold">{advisor.name}</span>
+                    {advisor.agentNumber && ` - ${advisor.agentNumber}`}
+                  </div>
+                  {expandedAdvisor === advisor.id && (
+                    <ul className="clients-list">
+                      {Array.isArray(advisor.clients) &&
+                        advisor.clients.map((client, index) => (
+                          <li key={index}>{client}</li>
+                        ))}
+                    </ul>
+                  )}
                 </div>
-                {expandedAdvisor === advisor.id && (
-                  <ul className="clients-list">
-                    {advisor.clients.map((client, index) => (
-                      <li key={index}>{client}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
+              ))}
           </div>
 
           <div className="renewals-section container">
@@ -271,31 +387,86 @@ const PromoterDashboard = () => {
               <div className="modal-content">
                 <h2>{selectedEvent ? "Editar Evento" : "Nuevo Evento"}</h2>
                 <div className="modal-body">
-                  <label>
-                    Cliente: {/* Añade este campo de selección de cliente */}
+                  <div className="form-group">
+                    <label>Tipo de Asistentes:</label>
                     <select
-                      value={selectedClient?.id_cliente || ""}
-                      onChange={(e) => {
-                        const client = clients.find(
-                          (c) => c.id_cliente === parseInt(e.target.value)
-                        );
-                        setSelectedClient(client);
-                      }}
+                      value={meetingDetails.attendeeType}
+                      onChange={(e) =>
+                        setMeetingDetails({
+                          ...meetingDetails,
+                          attendeeType: e.target.value,
+                        }) 
+                      }
+                      className="container-asistance"
                       required
                     >
-                      <option value="">Seleccione un cliente</option>
-                      {clients.map((client) => (
-                        <option
-                          key={client.id_cliente}
-                          value={client.id_cliente}
-                        >
-                          {client.nombre_completo}
-                        </option>
-                      ))}
+                      <option value="both">Clientes y Asesores</option>
+                      <option value="client">Solo Clientes</option>
+                      <option value="advisor">Solo Asesores</option>
                     </select>
-                  </label>
-                  <label>
-                    Título:
+                  </div>
+
+                  {(meetingDetails.attendeeType === "advisor" ||
+                    meetingDetails.attendeeType === "both") && (
+                    <div className="form-group">
+                      <label>
+                        Asesor: <span className="required">*</span>
+                      </label>
+                      <select
+                        value={selectedAdvisor?.id || ""}
+                        onChange={(e) => {
+                          const advisor = activeAdvisors.find(
+                            (a) => a.id === parseInt(e.target.value)
+                          );
+                          setSelectedAdvisor(advisor);
+                        }}
+                        required
+                      >
+                        <option value="">Seleccione un asesor</option>
+                        {Array.isArray(activeAdvisors) &&
+                          activeAdvisors.map((advisor) => (
+                            <option key={advisor.id} value={advisor.id}>
+                              {advisor.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {(meetingDetails.attendeeType === "client" ||
+                    meetingDetails.attendeeType === "both") && (
+                    <div className="form-group">
+                      <label>
+                        Cliente: <span className="required">*</span>
+                      </label>
+                      <select
+                        value={selectedClient?.id_cliente || ""}
+                        onChange={(e) => {
+                          const client = clients.find(
+                            (c) => c.id_cliente === parseInt(e.target.value)
+                          );
+                          setSelectedClient(client);
+                        }}
+                        required
+                      >
+                        <option value="">Seleccione un cliente</option>
+                        {Array.isArray(clients) &&
+                          clients.map((client) => (
+                            <option
+                              key={client.id_cliente}
+                              value={client.id_cliente}
+                            >
+                              {client.nombre_completo}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="form-group">
+                    <label>
+                      Título: <span className="required">*</span>
+                    </label>
                     <input
                       type="text"
                       value={meetingDetails.title}
@@ -307,9 +478,13 @@ const PromoterDashboard = () => {
                       }
                       required
                     />
-                  </label>
-                  <label>
-                    Fecha y hora de inicio:
+                  </div>
+
+                  <div className="form-group">
+                    <label>
+                      Fecha y hora de inicio:{" "}
+                      <span className="required">*</span>
+                    </label>
                     <input
                       type="datetime-local"
                       value={meetingDetails.startDateTime}
@@ -321,9 +496,12 @@ const PromoterDashboard = () => {
                       }
                       required
                     />
-                  </label>
-                  <label>
-                    Fecha y hora de fin:
+                  </div>
+
+                  <div className="form-group">
+                    <label>
+                      Fecha y hora de fin: <span className="required">*</span>
+                    </label>
                     <input
                       type="datetime-local"
                       value={meetingDetails.endDateTime}
@@ -335,10 +513,45 @@ const PromoterDashboard = () => {
                       }
                       required
                     />
-                  </label>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Tipo de Evento:</label>
+                    <div className="radio-group">
+                      <label className="radio-label">
+                        <input
+                          type="radio"
+                          value="meeting"
+                          checked={meetingDetails.eventType === "meeting"}
+                          onChange={() =>
+                            setMeetingDetails((prev) => ({
+                              ...prev,
+                              eventType: "meeting",
+                            }))
+                          }
+                        />
+                        <span>Crear Evento con Google Meet</span>
+                      </label>
+                      <label className="radio-label">
+                        <input
+                          type="radio"
+                          value="event"
+                          checked={meetingDetails.eventType === "event"}
+                          onChange={() =>
+                            setMeetingDetails((prev) => ({
+                              ...prev,
+                              eventType: "event",
+                            }))
+                          }
+                        />
+                        <span>Crear solo un evento</span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
+
                 <div className="modal-footer">
-                  <button onClick={handleSaveEvent}>
+                  <button onClick={handleSaveEvent} className="save-button">
                     {selectedEvent ? "Actualizar" : "Crear"}
                   </button>
                   {selectedEvent && (
@@ -352,8 +565,9 @@ const PromoterDashboard = () => {
                   <button
                     onClick={() => {
                       setIsModalOpen(false);
-                      setSelectedClient(null);
+                      resetForm();
                     }}
+                    className="cancel-button"
                   >
                     Cancelar
                   </button>

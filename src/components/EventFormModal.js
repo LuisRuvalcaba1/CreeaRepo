@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import "./EventFormModal.css";
 
 const EventFormModal = ({
   show,
@@ -178,14 +179,14 @@ const EventFormModal = ({
 
   const handleDelete = async (e) => {
     e.preventDefault();
-    e.stopPropagation(); // Agregar esto para evitar propagación del evento
+    e.stopPropagation();
     if (loading || !initialData?.id) return;
   
     if (window.confirm('¿Estás seguro de que deseas eliminar este evento?')) {
       setLoading(true);
       try {
-        // En lugar de hacer la llamada fetch aquí, usamos la función proporcionada
-        onDelete(initialData);
+        // Pasar solo el ID al padre
+        onDelete(initialData.id);
         onClose();
       } catch (error) {
         setError('Error al eliminar el evento');

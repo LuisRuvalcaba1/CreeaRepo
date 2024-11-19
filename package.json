@@ -81,10 +81,13 @@
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@babel/preset-env": "^7.25.8",
     "@babel/preset-react": "^7.25.7",
+    "autoprefixer": "^10.4.20",
     "babel-jest": "^29.7.0",
     "browserify-fs": "^1.0.0",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^27.5.1",
-    "stream-browserify": "^3.0.0"
+    "postcss": "^8.4.49",
+    "stream-browserify": "^3.0.0",
+    "tailwindcss": "^3.4.15"
   }
 }
