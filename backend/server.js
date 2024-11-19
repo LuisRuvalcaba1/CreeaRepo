@@ -2,6 +2,7 @@
 
 const express = require('express');
 const calendarRoutes = require('./routes/calendarRoutes');
+const notesRoutes = require('./routes/notesRoutes');
 const { sendCustomEmail, sendVerificationEmail } = require('./SendVerificationEmail.js');
 const { getConnection } = require('./db');
 const bcrypt = require('bcryptjs');
@@ -950,7 +951,8 @@ app.post('/generar-comprobante', async (req, res) => {
 // Usa las rutas de calendario en la ruta `/api/calendar`
 app.use('/api/calendar', calendarRoutes);
 app.use('/api', require('./routes/calendarRoutes'));
-    
+app.use('/api', notesRoutes);
+
 // Endpoint para guardar una nota
 app.post('/api/save-note', async (req, res) => {
   const { id_cliente, id_asesor, contenido } = req.body;
@@ -1034,7 +1036,6 @@ const notificationRoutes = require('./routes/notificationRoutes'); // Ajusta el 
 
 // Usa las rutas para notificaciones en el endpoint `/api/notifications`
 app.use('/api/notifications', notificationRoutes);
-
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

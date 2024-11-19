@@ -33,6 +33,111 @@ const AdvisorDashboard = () => {
     eventType: "meeting", // Agregar tipo de evento por defecto
   });
   const [isDeleting, setIsDeleting] = useState(false);
+  const [clientNotes, setClientNotes] = useState({});
+  const [newNote, setNewNote] = useState("");
+  const [editingNote, setEditingNote] = useState(null);
+  const [editNoteContent, setEditNoteContent] = useState("");
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
+
+  const fetchClientNotes = async (clientId) => {
+    setIsLoadingNotes(true);
+    try {
+      const response = await axios.get(`/api/notes/client/${clientId}`, {
+        params: { advisorId }
+      });
+      setClientNotes(prev => ({
+        ...prev,
+        [clientId]: response.data
+      }));
+    } catch (error) {
+      console.error("Error al cargar las notas:", error);
+      alert("Error al cargar las notas del cliente");
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  };
+
+  const handleCreateNote = async (clientId) => {
+    if (!newNote.trim()) {
+      alert("Por favor, escribe una nota antes de guardar.");
+      return;
+    }
+
+    try {
+      const response = await axios.post("/api/notes/create", {
+        id_cliente: clientId,
+        id_asesor: advisorId,
+        contenido: newNote
+      });
+
+      // Actualizar el estado local con la nueva nota
+      setClientNotes(prev => ({
+        ...prev,
+        [clientId]: [...(prev[clientId] || []), response.data]
+      }));
+      
+      setNewNote(""); // Limpiar el campo de nota
+      alert("Nota guardada exitosamente");
+    } catch (error) {
+      console.error("Error al guardar la nota:", error);
+      alert(error.response?.data?.message || "Error al guardar la nota");
+    }
+  };
+
+  // Función para iniciar la edición de una nota
+  const handleStartEditNote = (note) => {
+    setEditingNote(note.id_nota);
+    setEditNoteContent(note.contenido);
+  };
+
+  // Función para guardar la nota editada
+  const handleSaveEditedNote = async (noteId, clientId) => {
+    try {
+      const response = await axios.put(`/api/notes/${noteId}`, {
+        contenido: editNoteContent,
+        advisorId
+      });
+
+      // Actualizar el estado local con la nota editada
+      setClientNotes(prev => ({
+        ...prev,
+        [clientId]: prev[clientId].map(note => 
+          note.id_nota === noteId ? response.data : note
+        )
+      }));
+
+      setEditingNote(null);
+      setEditNoteContent("");
+      alert("Nota actualizada exitosamente");
+    } catch (error) {
+      console.error("Error al actualizar la nota:", error);
+      alert(error.response?.data?.message || "Error al actualizar la nota");
+    }
+  };
+
+  // Función para eliminar una nota
+  const handleDeleteNote = async (noteId, clientId) => {
+    if (!window.confirm("¿Estás seguro de que deseas eliminar esta nota?")) {
+      return;
+    }
+
+    try {
+      await axios.delete(`/api/notes/${noteId}`, {
+        params: { advisorId }
+      });
+
+      // Actualizar el estado local eliminando la nota
+      setClientNotes(prev => ({
+        ...prev,
+        [clientId]: prev[clientId].filter(note => note.id_nota !== noteId)
+      }));
+
+      alert("Nota eliminada exitosamente");
+    } catch (error) {
+      console.error("Error al eliminar la nota:", error);
+      alert(error.response?.data?.message || "Error al eliminar la nota");
+    }
+  };
 
   const fetchClients = async () => {
     try {
@@ -130,8 +235,13 @@ const AdvisorDashboard = () => {
     navigate("/calculator");
   };
 
-  const toggleExpandClient = (id) => {
-    setExpandedClient(expandedClient === id ? null : id);
+  const toggleExpandClient = (clientId) => {
+    if (expandedClient === clientId) {
+      setExpandedClient(null);
+    } else {
+      setExpandedClient(clientId);
+      fetchClientNotes(clientId);
+    }
   };
 
   const handleFilterChange = (e) => {
@@ -335,41 +445,107 @@ const AdvisorDashboard = () => {
               </select>
             </div>
 
-            {clients.length === 0 ? (
-              <p>Cargando clientes...</p>
-            ) : filteredClients.length === 0 ? (
-              <p>No se encontraron clientes</p>
-            ) : (
-              filteredClients.slice(0, visibleClients).map((client) => (
-                <div key={client.id_cliente} className="client">
-                  <div onClick={() => toggleExpandClient(client.id_cliente)}>
-                    <span className="bold">{client.nombre_completo}</span> -{" "}
-                    {client.estado_cuenta}
-                  </div>
-                  {expandedClient === client.id_cliente && (
-                    <ul className="client-details">
+           {filteredClients.slice(0, visibleClients).map((client) => (
+              <div key={client.id_cliente} className="client">
+                <div 
+                  onClick={() => toggleExpandClient(client.id_cliente)}
+                  className="client-header"
+                >
+                  <span className="bold">{client.nombre_completo}</span> -{" "}
+                  {client.estado_cuenta}
+                </div>
+                
+                {expandedClient === client.id_cliente && (
+                  <div className="client-details">
+                    <ul>
                       <li>Email: {client.correo_electronico}</li>
                       <li>Estado: {client.estado_cuenta}</li>
                       <li>Ocupación: {client.ocupacion}</li>
-                      <li>
+                    </ul>
+
+                    <div className="notes-section">
+                      <h4>Notas del Cliente</h4>
+                      
+                      {/* Área para crear nueva nota */}
+                      <div className="new-note-area">
                         <textarea
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          maxLength="255"
-                          placeholder="Escribe una nota (máx 255 caracteres)"
+                          value={newNote}
+                          onChange={(e) => setNewNote(e.target.value)}
+                          placeholder="Escribe una nueva nota..."
                           className="note-textarea"
+                          maxLength="255"
                         />
-                        <button
-                          onClick={() => handleRegisterNote(client.id_cliente)}
+                        <button 
+                          onClick={() => handleCreateNote(client.id_cliente)}
+                          className="create-note-btn"
                         >
                           Guardar Nota
                         </button>
-                      </li>
-                    </ul>
-                  )}
-                </div>
-              ))
-            )}
+                      </div>
+
+                      {/* Lista de notas existentes */}
+                      <div className="notes-list">
+                        {isLoadingNotes ? (
+                          <p>Cargando notas...</p>
+                        ) : clientNotes[client.id_cliente]?.length > 0 ? (
+                          clientNotes[client.id_cliente].map((note) => (
+                            <div key={note.id_nota} className="note-item">
+                              {editingNote === note.id_nota ? (
+                                <div className="edit-note-area">
+                                  <textarea
+                                    value={editNoteContent}
+                                    onChange={(e) => setEditNoteContent(e.target.value)}
+                                    className="note-textarea"
+                                    maxLength="255"
+                                  />
+                                  <div className="note-actions">
+                                    <button
+                                      onClick={() => handleSaveEditedNote(note.id_nota, client.id_cliente)}
+                                      className="save-note-btn"
+                                    >
+                                      Guardar
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingNote(null)}
+                                      className="cancel-btn"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="note-content">
+                                  <p>{note.contenido}</p>
+                                  <small className="note-date">
+                                    {new Date(note.fecha_creacion).toLocaleString()}
+                                  </small>
+                                  <div className="note-actions">
+                                    <button
+                                      onClick={() => handleStartEditNote(note)}
+                                      className="edit-btn"
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteNote(note.id_nota, client.id_cliente)}
+                                      className="delete-btn"
+                                    >
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <p>No hay notas para este cliente</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
             {visibleClients < filteredClients.length && (
               <button onClick={showMoreClients} className="load-more-btn">
                 Cargar más clientes
