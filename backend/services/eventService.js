@@ -298,15 +298,28 @@ const getClientsByAdvisor = async (advisorId) => {
   const connection = getConnection();
 
   try {
+    // Primero obtenemos el id_asesor correspondiente al id_usuario del asesor
+    const [advisorInfo] = await connection.query(
+      `SELECT id_asesor FROM asesor WHERE id_usuario = ?`,
+      [advisorId]
+    );
+
+    if (!advisorInfo.length) {
+      throw new Error("Asesor no encontrado");
+    }
+
+    const id_asesor = advisorInfo[0].id_asesor;
+
+    // Ahora usamos el id_asesor para obtener los clientes
     const [clients] = await connection.query(
       `SELECT 
         c.*,
         u.correo_electronico
-      FROM cliente c
-      JOIN usuario u ON c.id_usuario = u.id_usuario
-      WHERE c.id_asesor = ?
-      ORDER BY c.nombre_completo ASC`,
-      [advisorId]
+       FROM cliente c
+       JOIN usuario u ON c.id_usuario = u.id_usuario
+       WHERE c.id_asesor = ?
+       ORDER BY c.nombre_completo ASC`,
+      [id_asesor]
     );
 
     return clients;
@@ -315,6 +328,7 @@ const getClientsByAdvisor = async (advisorId) => {
     throw new Error("Error al obtener los clientes del asesor");
   }
 };
+
 
 // Nueva función para obtener todos los clientes (para promotores)
 const getAllClients = async () => {
@@ -358,7 +372,16 @@ const getClientsByUserType = async (userId) => {
       return await getAllClients();
     }
 
-    // Si es asesor, obtener solo sus clientes
+    // Si es asesor, obtener solo sus clientes usando el id_asesor
+    const [advisorInfo] = await connection.query(
+      `SELECT id_asesor FROM asesor WHERE id_usuario = ?`,
+      [userId]
+    );
+
+    if (!advisorInfo.length) {
+      throw new Error("Información de asesor no encontrada");
+    }
+
     return await getClientsByAdvisor(userId);
   } catch (error) {
     console.error("Error al obtener clientes:", error);
@@ -436,14 +459,29 @@ const getEventsByUser = async (userId) => {
 async function updateEvent(eventId, eventDetails) {
   const connection = getConnection();
   try {
-    const formattedStartDate = new Date(eventDetails.startDateTime)
-      .toISOString()
-      .slice(0, 19)
-      .replace("T", " ");
-    const formattedEndDate = new Date(eventDetails.endDateTime)
-      .toISOString()
-      .slice(0, 19)
-      .replace("T", " ");
+    // Crear fechas sin ajuste de zona horaria
+    const startDate = new Date(eventDetails.startDateTime);
+    const endDate = new Date(eventDetails.endDateTime);
+    
+    // Formatear las fechas manteniendo la zona horaria original
+    const formattedStartDate = startDate.getFullYear() + '-' +
+      String(startDate.getMonth() + 1).padStart(2, '0') + '-' +
+      String(startDate.getDate()).padStart(2, '0') + ' ' +
+      String(startDate.getHours()).padStart(2, '0') + ':' +
+      String(startDate.getMinutes()).padStart(2, '0') + ':' +
+      String(startDate.getSeconds()).padStart(2, '0');
+
+    const formattedEndDate = endDate.getFullYear() + '-' +
+      String(endDate.getMonth() + 1).padStart(2, '0') + '-' +
+      String(endDate.getDate()).padStart(2, '0') + ' ' +
+      String(endDate.getHours()).padStart(2, '0') + ':' +
+      String(endDate.getMinutes()).padStart(2, '0') + ':' +
+      String(endDate.getSeconds()).padStart(2, '0');
+
+    console.log('Actualizando evento con fechas:', {
+      start: formattedStartDate,
+      end: formattedEndDate
+    });
 
     let clientId = null;
     if (["client", "both"].includes(eventDetails.attendeeType)) {
