@@ -138,30 +138,42 @@ const createEventByClient = async (eventDetails) => {
   console.log("Creando evento de cliente con detalles:", eventDetails);
 
   try {
-    // Obtener información del asesor asignado al cliente
-    const [clientInfo] = await connection.query(
+    // Obtener información del cliente y su asesor asignado
+    const [clientAndAdvisorInfo] = await connection.query(
       `SELECT 
-        c.id_asesor,
-        u.correo_electronico as client_email,
-        a.correo_electronico as advisor_email,
-        a.id_usuario as advisor_id
+        c.id_cliente,
+        c.nombre_completo as client_name,
+        a.id_asesor,
+        a.nombre_completo as advisor_name,
+        uc.correo_electronico as client_email,
+        ua.correo_electronico as advisor_email
        FROM cliente c
-       JOIN usuario u ON c.id_usuario = u.id_usuario
-       JOIN usuario a ON c.id_asesor = a.id_usuario
+       JOIN usuario uc ON c.id_usuario = uc.id_usuario
+       JOIN asesor a ON c.id_asesor = a.id_asesor
+       JOIN usuario ua ON a.id_usuario = ua.id_usuario
        WHERE c.id_usuario = ?`,
       [eventDetails.createdBy]
     );
 
-    if (!clientInfo.length) {
+    if (!clientAndAdvisorInfo.length) {
       throw new Error("No se encontró la información del cliente o asesor");
     }
 
-    const { advisor_id, client_email, advisor_email } = clientInfo[0];
+    const { 
+      id_cliente, 
+      id_asesor,
+      client_email, 
+      advisor_email, 
+      client_name, 
+      advisor_name 
+    } = clientAndAdvisorInfo[0];
+    
     let meetLink = null;
     let googleEventId = null;
 
     if (eventDetails.eventType === "meeting") {
       try {
+        console.log("Creando evento en Google Calendar...");
         const googleEvent = await createGoogleEvent({
           title: eventDetails.title,
           startDateTime: eventDetails.startDateTime,
@@ -175,25 +187,37 @@ const createEventByClient = async (eventDetails) => {
         meetLink = googleEvent.meetLink;
         googleEventId = googleEvent.googleEventId;
 
-        // Enviar correo al cliente
-        await enviarConfirmacionCita({
+        console.log("Enviando correo de confirmación al cliente...");
+        // Enviar correo al cliente (creador del evento)
+        const clientEmailResult = await enviarConfirmacionCita({
           to: client_email,
           eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
           eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
-          link: meetLink
+          link: meetLink,
+          participantName: advisor_name,
+          hostName: client_name,
+          isHost: true
         });
 
-        // Enviar correo al asesor asignado
-        await enviarConfirmacionCita({
+        console.log("Resultado envío correo cliente:", clientEmailResult);
+
+        console.log("Enviando correo de confirmación al asesor...");
+        // Enviar correo al asesor
+        const advisorEmailResult = await enviarConfirmacionCita({
           to: advisor_email,
           eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
           eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
-          link: meetLink
+          link: meetLink,
+          participantName: client_name,
+          hostName: client_name,
+          isHost: false
         });
 
+        console.log("Resultado envío correo asesor:", advisorEmailResult);
+
       } catch (error) {
-        console.error("Error al crear evento en Google:", error);
-        throw new Error("No se pudo crear el evento en Google Calendar");
+        console.error("Error al crear evento en Google o enviar correos:", error);
+        throw new Error("No se pudo crear el evento en Google Calendar o enviar las notificaciones");
       }
     }
 
@@ -206,6 +230,7 @@ const createEventByClient = async (eventDetails) => {
       .slice(0, 19)
       .replace("T", " ");
 
+    console.log("Guardando evento en la base de datos...");
     const [result] = await connection.query(
       `INSERT INTO events (
         title, 
@@ -224,50 +249,26 @@ const createEventByClient = async (eventDetails) => {
         eventDetails.eventType,
         meetLink,
         eventDetails.createdBy,
-        advisor_id, // Usamos el ID del asesor asignado como client_id
+        id_cliente,  // Usando id_cliente para el registro
         googleEventId
       ]
     );
 
+    console.log("Evento creado exitosamente");
     return {
       id: result.insertId,
       title: eventDetails.title,
       start: formattedStartDate,
       end: formattedEndDate,
       eventType: eventDetails.eventType,
-      clientId: eventDetails.createdBy,
-      advisorId: advisor_id,
+      clientId: id_cliente,
+      advisorId: id_asesor,
       meetLink,
       createdBy: eventDetails.createdBy,
       googleEventId
     };
   } catch (error) {
     console.error("Error al crear evento:", error);
-    throw error;
-  }
-};
-
-const getClientAdvisor = async (clientId) => {
-  const connection = getConnection();
-  try {
-    const [result] = await connection.query(
-      `SELECT id_asesor, a.correo_electronico as advisor_email
-       FROM cliente c
-       JOIN usuario a ON c.id_asesor = a.id_usuario
-       WHERE c.id_usuario = ?`,
-      [clientId]
-    );
-
-    if (result.length === 0) {
-      throw new Error("Cliente no encontrado o sin asesor asignado");
-    }
-
-    return {
-      advisorId: result[0].id_asesor,
-      advisorEmail: result[0].advisor_email,
-    };
-  } catch (error) {
-    console.error("Error al obtener el asesor del cliente:", error);
     throw error;
   }
 };
