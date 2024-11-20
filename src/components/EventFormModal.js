@@ -22,10 +22,30 @@ const EventFormModal = ({
   const [error, setError] = useState("");
   const [advisors, setAdvisors] = useState([]);
 
+  const formatDateTimeForInput = (date) => {
+    if (!date) return "";
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "";
+
+    // Formatear la fecha manteniendo la zona horaria local
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const hours = String(d.getHours()).padStart(2, "0");
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   useEffect(() => {
     if (show && selectedDate) {
       const startDate = new Date(selectedDate);
-      startDate.setMinutes(Math.ceil(startDate.getMinutes() / 15) * 15);
+      // Redondear a los próximos 15 minutos sin afectar la zona horaria
+      const minutes = startDate.getMinutes();
+      const roundedMinutes = Math.ceil(minutes / 15) * 15;
+      startDate.setMinutes(roundedMinutes);
+      startDate.setSeconds(0);
+      startDate.setMilliseconds(0);
 
       const endDate = new Date(startDate);
       endDate.setHours(endDate.getHours() + 1);
@@ -36,7 +56,7 @@ const EventFormModal = ({
         endDateTime: formatDateTimeForInput(endDate),
       }));
 
-      if (userType === 'advisor') {
+      if (userType === "advisor") {
         loadClients();
       }
       if (userType === "promoter") {
@@ -81,13 +101,6 @@ const EventFormModal = ({
     }
   }, [show, initialData, clients]);
 
-  const formatDateTimeForInput = (date) => {
-    if (!date) return "";
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return "";
-    return d.toISOString().slice(0, 16);
-  };
-
   const loadClients = async () => {
     const advisorId = sessionStorage.getItem("userId");
     if (!advisorId) {
@@ -131,7 +144,9 @@ const EventFormModal = ({
     }
 
     if (start >= end) {
-      throw new Error("La hora de término debe ser posterior a la hora de inicio");
+      throw new Error(
+        "La hora de término debe ser posterior a la hora de inicio"
+      );
     }
   };
 
@@ -149,10 +164,14 @@ const EventFormModal = ({
         throw new Error("No se encontró ID del usuario");
       }
 
+      // Crear fechas manteniendo la zona horaria local
+      const startDateTime = new Date(formData.startDateTime);
+      const endDateTime = new Date(formData.endDateTime);
+
       let eventData = {
         title: formData.title.trim(),
-        startDateTime: formData.startDateTime,
-        endDateTime: formData.endDateTime,
+        startDateTime: startDateTime.toJSON(),
+        endDateTime: endDateTime.toJSON(),
         eventType: formData.eventType,
         createdBy: parseInt(userId),
       };
@@ -175,10 +194,11 @@ const EventFormModal = ({
           body: JSON.stringify(eventData),
         });
       } else {
-        const endpoint = userType === "client" 
-          ? "/api/calendar/create-event-client"
-          : "/api/calendar/create-event";
-          
+        const endpoint =
+          userType === "client"
+            ? "/api/calendar/create-event-client"
+            : "/api/calendar/create-event";
+
         response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

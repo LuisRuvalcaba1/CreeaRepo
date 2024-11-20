@@ -18,7 +18,7 @@ async function createEvent(eventDetails) {
     let meetLink = null;
     let googleEventId = null;
 
-    // Obtener información del cliente
+    // Obtener información del cliente y asesor...
     const [clientInfo] = await connection.query(
       `SELECT c.id_cliente, c.nombre_completo as client_name, 
               u.correo_electronico as client_email
@@ -28,7 +28,6 @@ async function createEvent(eventDetails) {
       [eventDetails.clientId]
     );
 
-    // Obtener información del asesor
     const [advisorInfo] = await connection.query(
       `SELECT a.id_asesor, a.nombre_completo as advisor_name,
               u.correo_electronico as advisor_email
@@ -41,6 +40,41 @@ async function createEvent(eventDetails) {
     if (!clientInfo.length || !advisorInfo.length) {
       throw new Error("No se encontró la información del cliente o asesor");
     }
+
+    // Función auxiliar para formatear fechas manteniendo la zona horaria correcta
+    const formatDateForMySQL = (dateString) => {
+      const date = new Date(dateString);
+      
+      // Obtener el offset de la zona horaria en minutos
+      const offset = date.getTimezoneOffset();
+      
+      // Crear una nueva fecha ajustada por el offset
+      const adjustedDate = new Date(date.getTime() - (offset * 60 * 1000));
+      
+      // Extraer los componentes de la fecha
+      const year = adjustedDate.getUTCFullYear();
+      const month = String(adjustedDate.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(adjustedDate.getUTCDate()).padStart(2, '0');
+      const hours = String(adjustedDate.getUTCHours()).padStart(2, '0');
+      const minutes = String(adjustedDate.getUTCMinutes()).padStart(2, '0');
+      const seconds = String(adjustedDate.getUTCSeconds()).padStart(2, '0');
+
+      // Retornar el formato para MySQL
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    };
+
+    const formattedStartDate = formatDateForMySQL(eventDetails.startDateTime);
+    const formattedEndDate = formatDateForMySQL(eventDetails.endDateTime);
+
+    console.log('Fechas originales:', {
+      start: eventDetails.startDateTime,
+      end: eventDetails.endDateTime
+    });
+
+    console.log('Fechas formateadas para MySQL:', {
+      start: formattedStartDate,
+      end: formattedEndDate
+    });
 
     if (eventDetails.eventType === "meeting") {
       try {
@@ -57,7 +91,7 @@ async function createEvent(eventDetails) {
         meetLink = googleEvent.meetLink;
         googleEventId = googleEvent.googleEventId;
 
-        // Enviar correo de confirmación al cliente
+        // Enviar correos de confirmación...
         await enviarConfirmacionCita({
           to: clientInfo[0].client_email,
           eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
@@ -68,7 +102,6 @@ async function createEvent(eventDetails) {
           isHost: false
         });
 
-        // Enviar correo de confirmación al asesor
         await enviarConfirmacionCita({
           to: advisorInfo[0].advisor_email,
           eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
@@ -83,15 +116,6 @@ async function createEvent(eventDetails) {
         throw new Error("No se pudo crear el evento en Google Calendar");
       }
     }
-
-    const formattedStartDate = new Date(eventDetails.startDateTime)
-      .toISOString()
-      .slice(0, 19)
-      .replace("T", " ");
-    const formattedEndDate = new Date(eventDetails.endDateTime)
-      .toISOString()
-      .slice(0, 19)
-      .replace("T", " ");
 
     const [result] = await connection.query(
       `INSERT INTO events (

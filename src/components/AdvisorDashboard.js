@@ -157,34 +157,39 @@ const AdvisorDashboard = () => {
       const response = await axios.get(
         `/api/calendar/get-events?advisorId=${advisorId}`
       );
-      const upcomingEvents = response.data.filter((event) => {
+      
+      // Ajustar las fechas al mostrarlas
+      const processedEvents = response.data.map((event) => ({
+        id: event.id,
+        title: event.title,
+        start: new Date(event.start),
+        end: new Date(event.end),
+        clientId: event.client_id,
+        clientName: event.client_name,
+        eventType: event.event_type,
+        meetLink: event.meet_link
+      }));
+  
+      setEvents(processedEvents);
+  
+      // Procesar notificaciones de eventos próximos
+      const upcomingEvents = processedEvents.filter((event) => {
         const eventDate = new Date(event.start);
         const now = new Date();
         const oneDayAhead = new Date(now.getTime() + 24 * 60 * 60 * 1000);
         return eventDate >= now && eventDate <= oneDayAhead;
       });
-
+  
       const newEvents = upcomingEvents.filter(
         (event) => !notifiedEvents.some((notified) => notified.id === event.id)
       );
-
+  
       if (newEvents.length > 0) {
         alert(
           `Tienes ${newEvents.length} eventos programados en las próximas 24 horas.`
         );
         setNotifiedEvents([...notifiedEvents, ...newEvents]);
       }
-
-      setEvents(
-        response.data.map((event) => ({
-          id: event.id,
-          title: event.title,
-          start: new Date(event.start),
-          end: new Date(event.end),
-          clientId: event.client_id,
-          clientName: event.client_name,
-        }))
-      );
     } catch (error) {
       console.error("Error al obtener eventos:", error);
     }
@@ -271,14 +276,24 @@ const AdvisorDashboard = () => {
   const showMoreClients = () => {
     setVisibleClients(visibleClients + 5);
   };
+  const formatDateTimeForInput = (date) => {
+    if (!date) return "";
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "";
+    
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16);
+  };
+  
 
   const handleOpenModal = (event = null) => {
     if (event) {
       setEditingEvent(event);
       setMeetingDetails({
         title: event.title,
-        startDateTime: event.start.toISOString().slice(0, 16),
-        endDateTime: event.end.toISOString().slice(0, 16),
+        startDateTime: formatDateTimeForInput(event.start),
+        endDateTime: formatDateTimeForInput(event.end),
         eventType: "meeting",
       });
       const eventClient = clients.find(
@@ -360,20 +375,24 @@ const AdvisorDashboard = () => {
       alert("Por favor, complete todos los campos.");
       return;
     }
-
+  
     try {
+      // Crear fechas sin ajuste de zona horaria
+      const startDate = new Date(meetingDetails.startDateTime);
+      const endDate = new Date(meetingDetails.endDateTime);
+  
       const eventData = {
         title: meetingDetails.title,
-        startDateTime: new Date(meetingDetails.startDateTime).toISOString(),
-        endDateTime: new Date(meetingDetails.endDateTime).toISOString(),
+        startDateTime: startDate.toISOString(),
+        endDateTime: endDate.toISOString(),
         eventType: meetingDetails.eventType,
-        clientId: parseInt(selectedClient.id_usuario), // Changed from id_cliente to id_usuario
+        clientId: parseInt(selectedClient.id_usuario),
         createdBy: parseInt(advisorId),
         attendees: [{ email: selectedClient.correo_electronico }],
       };
-
-      console.log("Datos del evento:", eventData); // Para debugging
-
+  
+      console.log("Datos del evento:", eventData);
+  
       if (editingEvent) {
         await axios.put(
           `/api/calendar/update-event/${editingEvent.id}`,
@@ -388,8 +407,8 @@ const AdvisorDashboard = () => {
         console.log("Evento creado:", response.data);
         alert("Reunión programada exitosamente.");
       }
-
-      await fetchEvents(); // Recargar eventos
+  
+      await fetchEvents();
       handleCloseModal();
     } catch (error) {
       console.error("Error al programar la reunión:", error);
