@@ -82,26 +82,30 @@ async function enviarRecordatorio({ to, eventDate, eventTime, link }) {
 /**
  * Enviar confirmación de cita al cliente después de que el asesor la programe
  */
-async function enviarConfirmacionCita({ to, eventDate, eventTime, link }) {
+async function enviarConfirmacionCita({ to, eventDate, eventTime, link, participantName, hostName, isHost }) {
   try {
     const mailOptions = {
       from: '"CreeaApp" <noreply@creeaapp.com>',
       to,
-      subject: 'Confirmación de cita programada',
+      subject: isHost ? 'Nueva reunión programada' : 'Invitación a reunión',
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px;">
-          <h2>Confirmación de Cita</h2>
-          <p>Se ha programado una reunión para:</p>
+          <h2>${isHost ? 'Nueva Reunión Programada' : 'Invitación a Reunión'}</h2>
+          <p>${isHost 
+              ? `Se ha programado una reunión con ${participantName}` 
+              : `${hostName} te ha invitado a una reunión`}</p>
+          <p>Detalles de la reunión:</p>
           <ul>
             <li><strong>Fecha:</strong> ${eventDate}</li>
             <li><strong>Hora:</strong> ${eventTime}</li>
+            ${link ? `<li><strong>Link de la reunión:</strong> <a href="${link}">${link}</a></li>` : ''}
           </ul>
           ${link ? `
-            <p>Puede unirse a la reunión a través del siguiente enlace:</p>
+            <p>Puedes unirte a la reunión haciendo clic en el siguiente botón:</p>
             <p><a href="${link}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Unirse a la reunión</a></p>
           ` : ''}
-          <p>Por favor, agregue este evento a su calendario.</p>
-          <p>Si tiene alguna pregunta o necesita reprogramar, por favor contáctenos.</p>
+          <p>Por favor, agrega este evento a tu calendario.</p>
+          <p>Si necesitas hacer algún cambio o tienes preguntas, por favor contáctanos.</p>
           <p>Saludos cordiales,<br>Equipo CreeaApp</p>
         </div>
       `

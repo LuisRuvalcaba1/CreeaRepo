@@ -139,7 +139,8 @@ const SignUpClient = () => {
         }
 
         setErrors(tempErrors);
-
+        console.log('Errores:', tempErrors);
+        console.log('Datos del formulario:', formData);
         return Object.keys(tempErrors).length === 0;
     };
 

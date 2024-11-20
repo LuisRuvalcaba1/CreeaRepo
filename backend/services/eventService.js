@@ -18,16 +18,29 @@ async function createEvent(eventDetails) {
     let meetLink = null;
     let googleEventId = null;
 
-    // Obtener correos de los participantes
-    const [clientEmail] = await connection.query(
-      'SELECT correo_electronico FROM usuario WHERE id_usuario = ?',
+    // Obtener información del cliente
+    const [clientInfo] = await connection.query(
+      `SELECT c.id_cliente, c.nombre_completo as client_name, 
+              u.correo_electronico as client_email
+       FROM cliente c
+       JOIN usuario u ON c.id_usuario = u.id_usuario
+       WHERE c.id_cliente = ?`,
       [eventDetails.clientId]
     );
 
-    const [advisorEmail] = await connection.query(
-      'SELECT correo_electronico FROM usuario WHERE id_usuario = ?',
+    // Obtener información del asesor
+    const [advisorInfo] = await connection.query(
+      `SELECT a.id_asesor, a.nombre_completo as advisor_name,
+              u.correo_electronico as advisor_email
+       FROM asesor a
+       JOIN usuario u ON a.id_usuario = u.id_usuario
+       WHERE a.id_usuario = ?`,
       [eventDetails.createdBy]
     );
+
+    if (!clientInfo.length || !advisorInfo.length) {
+      throw new Error("No se encontró la información del cliente o asesor");
+    }
 
     if (eventDetails.eventType === "meeting") {
       try {
@@ -36,13 +49,35 @@ async function createEvent(eventDetails) {
           startDateTime: eventDetails.startDateTime,
           endDateTime: eventDetails.endDateTime,
           attendees: [
-            { email: clientEmail[0].correo_electronico },
-            { email: advisorEmail[0].correo_electronico }
+            { email: clientInfo[0].client_email },
+            { email: advisorInfo[0].advisor_email }
           ],
         });
 
         meetLink = googleEvent.meetLink;
         googleEventId = googleEvent.googleEventId;
+
+        // Enviar correo de confirmación al cliente
+        await enviarConfirmacionCita({
+          to: clientInfo[0].client_email,
+          eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
+          eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
+          link: meetLink,
+          participantName: clientInfo[0].client_name,
+          hostName: advisorInfo[0].advisor_name,
+          isHost: false
+        });
+
+        // Enviar correo de confirmación al asesor
+        await enviarConfirmacionCita({
+          to: advisorInfo[0].advisor_email,
+          eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
+          eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
+          link: meetLink,
+          participantName: clientInfo[0].client_name,
+          hostName: advisorInfo[0].advisor_name,
+          isHost: true
+        });
       } catch (error) {
         console.error("Error al crear evento en Google:", error);
         throw new Error("No se pudo crear el evento en Google Calendar");
@@ -76,26 +111,10 @@ async function createEvent(eventDetails) {
         eventDetails.eventType,
         meetLink,
         eventDetails.createdBy,
-        eventDetails.clientId,
+        clientInfo[0].id_cliente,
         googleEventId,
       ]
     );
-
-    // Enviar correos de confirmación
-    await enviarConfirmacionCita({
-      to: clientEmail[0].correo_electronico,
-      eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
-      eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
-      link: meetLink
-    });
-
-    // También enviar correo al asesor
-    await enviarConfirmacionCita({
-      to: advisorEmail[0].correo_electronico,
-      eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
-      eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
-      link: meetLink
-    });
 
     return {
       id: result.insertId,
@@ -103,7 +122,7 @@ async function createEvent(eventDetails) {
       start: formattedStartDate,
       end: formattedEndDate,
       eventType: eventDetails.eventType,
-      clientId: eventDetails.clientId,
+      clientId: clientInfo[0].id_cliente,
       meetLink,
       createdBy: eventDetails.createdBy,
       googleEventId,
