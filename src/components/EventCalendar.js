@@ -1,25 +1,17 @@
-import React, { useState } from "react";
+import React from "react";
 import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
-import EventFormModal from "./EventFormModal";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "./EventCalendar.css";
 
 const localizer = momentLocalizer(moment);
 
 const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete, userType }) => {
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [showEventForm, setShowEventForm] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(null);
-
   const eventStyleGetter = (event) => {
     let className = "";
     switch (event.event_type) {
       case "advisor":
         className = "rbc-event-asesor";
-        break;
-      case "both":
-        className = "rbc-event-both";
         break;
       default:
         className = "rbc-event";
@@ -28,42 +20,11 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete, userTyp
   };
 
   const handleSelectSlot = ({ start }) => {
-    setSelectedDate(start);
-    setSelectedEvent(null);
-    setShowEventForm(true);
+    onEventAdd(start); // Solo pasar la fecha seleccionada
   };
 
   const handleSelectEvent = (event) => {
-    setSelectedEvent(event);
-    setSelectedDate(event.start);
-    setShowEventForm(true);
-  };
-
-  const handleSaveEvent = async (eventData) => {
-    try {
-      if (selectedEvent) {
-        await onEventEdit(eventData);
-      } else {
-        await onEventAdd(eventData);
-      }
-      setShowEventForm(false);
-    } catch (error) {
-      console.error("Error al guardar el evento:", error);
-      // Aquí podrías mostrar un mensaje de error al usuario
-    }
-  };
-
-  const handleDeleteEvent = async (event) => {
-    if (event) {
-      try {
-        await onEventDelete(event.id || event);
-        setShowEventForm(false);
-        setSelectedEvent(null);
-      } catch (error) {
-        console.error("Error al eliminar el evento:", error);
-        // Aquí podrías mostrar un mensaje de error al usuario
-      }
-    }
+    onEventEdit(event); // Pasar el evento seleccionado
   };
 
   const CustomEvent = ({ event }) => (
@@ -100,18 +61,6 @@ const EventCalendar = ({ events, onEventAdd, onEventEdit, onEventDelete, userTyp
           event: CustomEvent
         }}
       />
-
-      {showEventForm && (
-        <EventFormModal
-          show={showEventForm}
-          onClose={() => setShowEventForm(false)}
-          onSave={handleSaveEvent}
-          onDelete={handleDeleteEvent}
-          initialData={selectedEvent}
-          selectedDate={selectedDate}
-          userType={userType}
-        />
-      )}
     </div>
   );
 };

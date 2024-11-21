@@ -6,6 +6,7 @@ import EventCalendar from "./EventCalendar";
 import "./PromoterDashboard.css";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import EventFormModal from "./EventFormModal";
 
 const PromoterDashboard = () => {
   const navigate = useNavigate();
@@ -18,16 +19,9 @@ const PromoterDashboard = () => {
   const [exchangeRates, setExchangeRates] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [meetingDetails, setMeetingDetails] = useState({
-    title: "",
-    startDateTime: "",
-    endDateTime: "",
-    eventType: "event",
-    attendeeType: "both",
-  });
+  const [selectedDate, setSelectedDate] = useState(null);
+  
   const [clients, setClients] = useState([]);
-  const [selectedClient, setSelectedClient] = useState(null);
-  const [selectedAdvisor, setSelectedAdvisor] = useState(null);
   const [activeAdvisors, setActiveAdvisors] = useState([]);
 
   useEffect(() => {
@@ -98,184 +92,94 @@ const PromoterDashboard = () => {
     }
   };
 
-  const handleEventClick = (event) => {
-    setSelectedEvent(event);
-    setMeetingDetails({
-      title: event.title,
-      startDateTime: event.start.toISOString().slice(0, 16),
-      endDateTime: event.end.toISOString().slice(0, 16),
-      eventType: event.eventType || "event",
-      attendeeType: event.attendeeType || "both",
-    });
-    setIsModalOpen(true);
-  };
 
-  const handleAddEvent = () => {
-    setSelectedEvent(null);
-    setMeetingDetails({
-      title: "",
-      startDateTime: "",
-      endDateTime: "",
-      eventType: "event",
-      attendeeType: "both",
-    });
-    setSelectedClient(null);
-    setSelectedAdvisor(null);
-    setIsModalOpen(true);
-  };
-
-  const handleSaveEvent = async () => {
-    if (!meetingDetails.title || !meetingDetails.startDateTime || !meetingDetails.endDateTime) {
+  const handleSaveEvent = async (formData) => {
+    console.log("Datos recibidos del modal:", formData);
+    
+    if (!formData.title || !formData.startDateTime || !formData.endDateTime) {
       alert("Por favor, complete todos los campos obligatorios.");
       return;
     }
-
-    // Validaciones según el tipo de asistentes
-    if (meetingDetails.attendeeType === "both" && (!selectedClient || !selectedAdvisor)) {
-      alert("Por favor, seleccione tanto cliente como asesor.");
-      return;
-    } else if (meetingDetails.attendeeType === "client" && !selectedClient) {
-      alert("Por favor, seleccione un cliente.");
-      return;
-    } else if (meetingDetails.attendeeType === "advisor" && !selectedAdvisor) {
-      alert("Por favor, seleccione un asesor.");
-      return;
-    }
-
+  
     try {
-      let eventData;
-
-      switch (meetingDetails.attendeeType) {
-        case "both":
-          // Crear dos eventos separados: uno para el cliente y otro para el asesor
-          eventData = {
-            title: meetingDetails.title,
-            startDateTime: meetingDetails.startDateTime,
-            endDateTime: meetingDetails.endDateTime,
-            eventType: meetingDetails.eventType,
-            createdBy: promotorID,
-            attendeeType: meetingDetails.attendeeType,
-            events: [
-              {
-                clientId: selectedClient.id_cliente,
-                email: selectedClient.correo_electronico,
-                type: 'client'
-              },
-              {
-                clientId: selectedAdvisor.id,
-                email: selectedAdvisor.email,
-                type: 'advisor'
-              }
-            ]
-          };
-          break;
-
-        case "client":
-          eventData = {
-            title: meetingDetails.title,
-            startDateTime: meetingDetails.startDateTime,
-            endDateTime: meetingDetails.endDateTime,
-            eventType: meetingDetails.eventType,
-            createdBy: promotorID,
-            attendeeType: meetingDetails.attendeeType,
-            events: [
-              {
-                clientId: selectedClient.id_cliente,
-                email: selectedClient.correo_electronico,
-                type: 'client'
-              }
-            ]
-          };
-          break;
-
-        case "advisor":
-          eventData = {
-            title: meetingDetails.title,
-            startDateTime: meetingDetails.startDateTime,
-            endDateTime: meetingDetails.endDateTime,
-            eventType: meetingDetails.eventType,
-            createdBy: promotorID,
-            attendeeType: meetingDetails.attendeeType,
-            events: [
-              {
-                clientId: selectedAdvisor.id,
-                email: selectedAdvisor.email,
-                type: 'advisor'
-              }
-            ]
-          };
-          break;
-
-        case "all":
-          // Este caso requerirá una lógica especial en el backend para obtener todos los usuarios
-          eventData = {
-            title: meetingDetails.title,
-            startDateTime: meetingDetails.startDateTime,
-            endDateTime: meetingDetails.endDateTime,
-            eventType: meetingDetails.eventType,
-            createdBy: promotorID,
-            attendeeType: "all"
-          };
-          break;
-
-        default:
-          throw new Error("Tipo de asistentes no válido");
-      }
-
       if (selectedEvent) {
-        await axios.put(`/api/calendar/update-event/${selectedEvent.id}`, eventData);
+        // Si es una actualización, solo enviamos los campos editables
+        const updateData = {
+          title: formData.title,
+          startDateTime: formData.startDateTime,
+          endDateTime: formData.endDateTime,
+          // Mantenemos los valores originales para estos campos
+          eventType: selectedEvent.eventType,
+          attendeeType: selectedEvent.attendeeType,
+          clientId: selectedEvent.clientId,
+          createdBy: promotorID,
+        };
+  
+        await axios.put(
+          `/api/calendar/update-event/${selectedEvent.id}`,
+          updateData
+        );
         alert("Evento actualizado exitosamente.");
       } else {
-        await axios.post("/api/calendar/create-event", eventData);
-        alert("Evento creado exitosamente.");
+        // Si es un nuevo evento
+        let eventData = {
+          title: formData.title,
+          startDateTime: formData.startDateTime,
+          endDateTime: formData.endDateTime,
+          eventType: formData.eventType,
+          createdBy: promotorID,
+          attendeeType: formData.attendeeType,
+          events: formData.events
+        };
+  
+        const response = await axios.post(
+          "/api/calendar/create-event-promotor",
+          eventData
+        );
+        if (response.data) {
+          alert("Evento creado exitosamente");
+        }
       }
-
+  
       await fetchEvents();
       setIsModalOpen(false);
       resetForm();
     } catch (error) {
       console.error("Error al guardar el evento:", error);
-      alert("Error al guardar el evento: " + (error.response?.data?.error || error.message));
+      alert(
+        "Error al guardar el evento: " +
+          (error.response?.data?.error || error.message)
+      );
     }
   };
 
   const resetForm = () => {
     setSelectedEvent(null);
-    setSelectedClient(null);
-    setSelectedAdvisor(null);
-    setMeetingDetails({
-      title: "",
-      startDateTime: "",
-      endDateTime: "",
-      eventType: "event",
-      attendeeType: "both",
-    });
   };
 
   const handleDeleteEvent = async (eventId) => {
     // Si recibimos un objeto en lugar de un ID, extraemos el ID
-    const id = typeof eventId === 'object' ? eventId.id : eventId;
-    
+    const id = typeof eventId === "object" ? eventId.id : eventId;
+
     if (!id) {
-      console.error('No se pudo obtener el ID del evento');
-      alert('Error al eliminar el evento: ID no válido');
+      console.error("No se pudo obtener el ID del evento");
+      alert("Error al eliminar el evento: ID no válido");
       return;
     }
-  
+
     if (window.confirm("¿Está seguro de que desea eliminar este evento?")) {
       try {
         await axios.delete(`/api/calendar/delete-event/${id}`);
         await fetchEvents(); // Recargar eventos
         setIsModalOpen(false);
         setSelectedEvent(null);
-        setSelectedClient(null);
-        setSelectedAdvisor(null);
+        alert("Evento eliminado exitosamente");
       } catch (error) {
         console.error("Error al eliminar el evento:", error);
         alert("Error al eliminar el evento");
       }
     }
-  };  
+  };
 
   const toggleExpandAdvisor = (id) => {
     setExpandedAdvisor(expandedAdvisor === id ? null : id);
@@ -289,12 +193,17 @@ const PromoterDashboard = () => {
     setShowChatbot(false);
   };
 
+  const handleOpenModal = (event = null, start = null) => {
+    setSelectedDate(start);
+    setSelectedEvent(event);
+    setIsModalOpen(true);
+  };
+
   return (
     <div className="promoter-dashboard">
       <Header />
       <div className="main-content">
         <div className="left-section">
-
           <div className="products-section container">
             <h2>Productos</h2>
             <div className="product-options">
@@ -372,206 +281,25 @@ const PromoterDashboard = () => {
             <h2>Calendario</h2>
             <EventCalendar
               events={events}
-              onEventClick={handleEventClick}
-              onEventAdd={handleAddEvent}
+              onEventAdd={(start) => handleOpenModal(null, start)}
+              onEventEdit={(event) => handleOpenModal(event)}
               onEventDelete={handleDeleteEvent}
               userType="promoter"
             />
+
+            <EventFormModal
+              show={isModalOpen}
+              onClose={() => {
+                setIsModalOpen(false);
+                resetForm();
+              }}
+              onSave={handleSaveEvent}
+              onDelete={handleDeleteEvent}
+              initialData={selectedEvent}
+              selectedDate={selectedDate}
+              userType="promoter"
+            />
           </div>
-
-          {isModalOpen && (
-            <div className="modal">
-              <div className="modal-content">
-                <h2>{selectedEvent ? "Editar Evento" : "Nuevo Evento"}</h2>
-                <div className="modal-body">
-                  <div className="form-group">
-                    <label>Tipo de Asistentes:</label>
-                    <select
-                      value={meetingDetails.attendeeType}
-                      onChange={(e) =>
-                        setMeetingDetails({
-                          ...meetingDetails,
-                          attendeeType: e.target.value,
-                        }) 
-                      }
-                      className="container-asistance"
-                      required
-                    >
-                      <option value="both">Clientes y Asesores</option>
-                      <option value="client">Solo Clientes</option>
-                      <option value="advisor">Solo Asesores</option>
-                    </select>
-                  </div>
-
-                  {(meetingDetails.attendeeType === "advisor" ||
-                    meetingDetails.attendeeType === "both") && (
-                    <div className="form-group">
-                      <label>
-                        Asesor: <span className="required">*</span>
-                      </label>
-                      <select
-                        value={selectedAdvisor?.id || ""}
-                        onChange={(e) => {
-                          const advisor = activeAdvisors.find(
-                            (a) => a.id === parseInt(e.target.value)
-                          );
-                          setSelectedAdvisor(advisor);
-                        }}
-                        required
-                      >
-                        <option value="">Seleccione un asesor</option>
-                        {Array.isArray(activeAdvisors) &&
-                          activeAdvisors.map((advisor) => (
-                            <option key={advisor.id} value={advisor.id}>
-                              {advisor.name}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {(meetingDetails.attendeeType === "client" ||
-                    meetingDetails.attendeeType === "both") && (
-                    <div className="form-group">
-                      <label>
-                        Cliente: <span className="required">*</span>
-                      </label>
-                      <select
-                        value={selectedClient?.id_cliente || ""}
-                        onChange={(e) => {
-                          const client = clients.find(
-                            (c) => c.id_cliente === parseInt(e.target.value)
-                          );
-                          setSelectedClient(client);
-                        }}
-                        required
-                      >
-                        <option value="">Seleccione un cliente</option>
-                        {Array.isArray(clients) &&
-                          clients.map((client) => (
-                            <option
-                              key={client.id_cliente}
-                              value={client.id_cliente}
-                            >
-                              {client.nombre_completo}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
-
-                  <div className="form-group">
-                    <label>
-                      Título: <span className="required">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={meetingDetails.title}
-                      onChange={(e) =>
-                        setMeetingDetails({
-                          ...meetingDetails,
-                          title: e.target.value,
-                        })
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>
-                      Fecha y hora de inicio:{" "}
-                      <span className="required">*</span>
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={meetingDetails.startDateTime}
-                      onChange={(e) =>
-                        setMeetingDetails({
-                          ...meetingDetails,
-                          startDateTime: e.target.value,
-                        })
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>
-                      Fecha y hora de fin: <span className="required">*</span>
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={meetingDetails.endDateTime}
-                      onChange={(e) =>
-                        setMeetingDetails({
-                          ...meetingDetails,
-                          endDateTime: e.target.value,
-                        })
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Tipo de Evento:</label>
-                    <div className="radio-group">
-                      <label className="radio-label">
-                        <input
-                          type="radio"
-                          value="meeting"
-                          checked={meetingDetails.eventType === "meeting"}
-                          onChange={() =>
-                            setMeetingDetails((prev) => ({
-                              ...prev,
-                              eventType: "meeting",
-                            }))
-                          }
-                        />
-                        <span>Crear Evento con Google Meet</span>
-                      </label>
-                      <label className="radio-label">
-                        <input
-                          type="radio"
-                          value="event"
-                          checked={meetingDetails.eventType === "event"}
-                          onChange={() =>
-                            setMeetingDetails((prev) => ({
-                              ...prev,
-                              eventType: "event",
-                            }))
-                          }
-                        />
-                        <span>Crear solo un evento</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="modal-footer">
-                  <button onClick={handleSaveEvent} className="save-button">
-                    {selectedEvent ? "Actualizar" : "Crear"}
-                  </button>
-                  {selectedEvent && (
-                    <button
-                      onClick={() => handleDeleteEvent(selectedEvent.id)}
-                      className="delete-button"
-                    >
-                      Eliminar
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setIsModalOpen(false);
-                      resetForm();
-                    }}
-                    className="cancel-button"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="exchange-rate-section container">
             <h2>Tipo de Cambio</h2>

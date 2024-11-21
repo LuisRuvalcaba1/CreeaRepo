@@ -8,6 +8,7 @@ const {
   getClientsByUserType,
   getAdvisors,
   createEventByClient,
+  createEventByPromotor,
   blockTimeInterval,
   getUpcomingBirthdays,
 } = require("../services/eventService"); // Servicio para la base de datos
@@ -78,6 +79,35 @@ router.post("/create-event-client", async (req, res) => {
     res.status(500).json({
       error: "Error al crear el evento",
       details: error.message,
+    });
+  }
+});
+
+router.post("/create-event-promotor", async (req, res) => {
+  console.log("Datos recibidos para crear evento por promotor:", req.body);
+
+  try {
+    const eventDetails = {
+      title: req.body.title,
+      startDateTime: req.body.startDateTime,
+      endDateTime: req.body.endDateTime,
+      eventType: req.body.eventType || "event",
+      createdBy: req.body.createdBy,
+      attendeeType: req.body.attendeeType,
+      events: req.body.events // Array de eventos para clientes y/o asesores
+    };
+
+    const savedEvents = await createEventByPromotor(eventDetails);
+
+    res.status(201).json({
+      message: "Eventos creados exitosamente",
+      eventData: savedEvents
+    });
+  } catch (error) {
+    console.error("Error en la ruta de crear evento por promotor:", error);
+    res.status(500).json({
+      error: "Error al crear el evento",
+      details: error.message
     });
   }
 });

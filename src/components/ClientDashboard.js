@@ -6,6 +6,7 @@ import EventCalendar from "./EventCalendar";
 import axios from "axios";
 import moment from "moment";
 import "./ClientDashboard.css";
+import EventFormModal from "./EventFormModal";
 
 const ClientDashboard = () => {
   const [events, setEvents] = useState([]);
@@ -17,16 +18,11 @@ const ClientDashboard = () => {
   const [advisorNotes, setAdvisorNotes] = useState([]);
   const navigate = useNavigate();
   const clientId = sessionStorage.getItem("userId");
-  const [editingEvent, setEditingEvent] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [notifiedEvents, setNotifiedEvents] = useState([]);
-  const [meetingDetails, setMeetingDetails] = useState({
-    title: "",
-    startDateTime: "",
-    endDateTime: "",
-    eventType: "meeting", // Agregar tipo de evento por defecto
-  });
+
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
 
   const fetchEvents = async () => {
     try {
@@ -71,69 +67,68 @@ const ClientDashboard = () => {
     }
   };
 
-  const handleOpenModal = (event = null) => {
+  const handleOpenModal = (event = null, start = null) => {
+    console.log('handleOpenModal called with:', { event, start });
+    
     if (event) {
-      setEditingEvent(event);
-      setMeetingDetails({
-        title: event.title,
-        startDateTime: event.start.toISOString().slice(0, 16),
-        endDateTime: event.end.toISOString().slice(0, 16),
-        eventType: "meeting"
+      console.log('Existing event:', event);
+      setSelectedEvent({
+        ...event,
+        startDateTime: formatDateTimeForInput(event.start),
+        endDateTime: formatDateTimeForInput(event.end),
       });
-    } else {
-      setEditingEvent(null);
-      setMeetingDetails({
-        title: "",
-        startDateTime: "",
-        endDateTime: "",
-        eventType: "meeting"
+    } else if (start) {
+      console.log('New event start date:', start);
+      const startDate = new Date(start);
+      const endDate = new Date(start);
+      endDate.setHours(startDate.getHours() + 1); // Añadir una hora para la fecha final
+  
+      // Asegurarnos de mantener la hora seleccionada del calendario
+      const clickedHour = startDate.getHours();
+      const clickedMinutes = startDate.getMinutes();
+  
+      // Formatear manteniendo la hora exacta que se clickeó
+      const formattedStart = formatDateTimeForInput(startDate, clickedHour, clickedMinutes);
+      const formattedEnd = formatDateTimeForInput(endDate, clickedHour + 1, clickedMinutes);
+      
+      console.log('Formatted start date:', formattedStart);
+      console.log('Formatted end date:', formattedEnd);
+  
+      setSelectedEvent({
+        title: '',
+        startDateTime: formattedStart,
+        endDateTime: formattedEnd,
       });
     }
     setIsModalOpen(true);
   };
+  
+  // Función modificada para manejar horas específicas
+  const formatDateTimeForInput = (date, specificHour = null, specificMinutes = null) => {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    
+    // Usar las horas y minutos específicos si se proporcionan
+    const hours = specificHour !== null ? specificHour : d.getHours();
+    const minutes = specificMinutes !== null ? specificMinutes : d.getMinutes();
+    
+    // Formatear fecha manteniendo la hora exacta
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const formattedHours = String(hours).padStart(2, '0');
+    const formattedMinutes = String(minutes).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${formattedHours}:${formattedMinutes}`;
+  };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setMeetingDetails({
-      title: "",
-      startDateTime: "",
-      endDateTime: "",
-      eventType: "meeting"
-    });
-    setEditingEvent(null);
+    setSelectedEvent(null);
   };
 
-  const handleScheduleMeeting = async () => {
-    if (!meetingDetails.title || !meetingDetails.startDateTime || !meetingDetails.endDateTime) {
-      alert("Por favor, complete todos los campos.");
-      return;
-    }
-
-    try {
-      const eventData = {
-        title: meetingDetails.title,
-        startDateTime: new Date(meetingDetails.startDateTime).toISOString(),
-        endDateTime: new Date(meetingDetails.endDateTime).toISOString(),
-        eventType: meetingDetails.eventType,
-        createdBy: parseInt(clientId)
-      };
-
-      if (editingEvent) {
-        await axios.put(`/api/calendar/update-event/${editingEvent.id}`, eventData);
-        alert("Evento actualizado exitosamente.");
-      } else {
-        await axios.post("/api/calendar/create-event-client", eventData);
-        alert("Reunión programada exitosamente.");
-      }
-
-      await fetchEvents();
-      handleCloseModal();
-    } catch (error) {
-      console.error("Error al programar la reunión:", error);
-      const errorMessage = error.response?.data?.error || error.response?.data?.details || error.message;
-      alert("Error al programar la reunión: " + errorMessage);
-    }
-  };
+  // Función auxiliar para formatear fechas
 
   const fetchAdvisorNotes = async () => {
     try {
@@ -196,12 +191,59 @@ const ClientDashboard = () => {
     }
   };
 
-  const handleEventDelete = async (eventId) => {
+  const handleSaveEvent = async (formData) => {
     try {
-      await axios.delete(`/api/calendar/delete-event/${eventId}`);
-      await fetchEvents();
+      const eventData = {
+        ...formData,
+        createdBy: parseInt(clientId),
+        eventType: formData.eventType || "meeting",
+      };
+
+      const response = await fetch("/api/calendar/create-event-client", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(eventData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || "Error al crear el evento");
+      }
+
+      const data = await response.json();
+      await fetchEvents(); // Recargar eventos inmediatamente
+      setIsModalOpen(false); // Cerrar el modal después de guardar
+      setSelectedEvent(null); // Limpiar el evento seleccionado
+      setSelectedDate(null); // Limpiar la fecha seleccionada
+      return data;
     } catch (error) {
-      console.error("Error al eliminar el evento:", error);
+      console.error("Error al guardar el evento:", error);
+      throw error;
+    }
+  };
+
+  const handleDeleteEvent = async (eventId) => {
+    // Si recibimos un objeto en lugar de un ID, extraemos el ID
+    const id = typeof eventId === "object" ? eventId.id : eventId;
+
+    if (!id) {
+      console.error("No se pudo obtener el ID del evento");
+      alert("Error al eliminar el evento: ID no válido");
+      return;
+    }
+
+    if (window.confirm("¿Está seguro de que desea eliminar este evento?")) {
+      try {
+        await axios.delete(`/api/calendar/delete-event/${id}`);
+        await fetchEvents(); // Recargar eventos
+        setIsModalOpen(false);
+        setSelectedEvent(null);
+      } catch (error) {
+        console.error("Error al eliminar el evento:", error);
+        alert("Error al eliminar el evento");
+      }
     }
   };
 
@@ -294,75 +336,24 @@ const ClientDashboard = () => {
             <h2>Calendario</h2>
             <EventCalendar
               events={events}
-              onEventAdd={() => handleOpenModal()}
+              onEventAdd={(start) => handleOpenModal(null, start)} // Asegurarse de que este prop exista
               onEventEdit={(event) => handleOpenModal(event)}
-              onEventDelete={handleEventDelete}
+              onEventDelete={handleDeleteEvent}
+              userType="client"
+            />
+
+            <EventFormModal
+              show={isModalOpen}
+              onClose={() => {
+                setIsModalOpen(false);
+                setSelectedEvent(null);
+              }}
+              onSave={handleSaveEvent}
+              onDelete={handleDeleteEvent}
+              initialData={selectedEvent} // Ahora contiene startDateTime y endDateTime formateados
               userType="client"
             />
           </div>
-
-          {/* Modal */}
-          {isModalOpen && (
-            <div className="modal">
-              <div className="modal-content">
-                <h2>{editingEvent ? "Editar Evento" : "Programar Evento"}</h2>
-                <label>
-                  Título:
-                  <input
-                    type="text"
-                    value={meetingDetails.title}
-                    onChange={(e) =>
-                      setMeetingDetails({
-                        ...meetingDetails,
-                        title: e.target.value,
-                      })
-                    }
-                    placeholder="Ingrese el título del evento"
-                  />
-                </label>
-                <label>
-                  Fecha y Hora de Inicio:
-                  <input
-                    type="datetime-local"
-                    value={meetingDetails.startDateTime}
-                    onChange={(e) =>
-                      setMeetingDetails({
-                        ...meetingDetails,
-                        startDateTime: e.target.value,
-                      })
-                    }
-                  />
-                </label>
-                <label>
-                  Fecha y Hora de Término:
-                  <input
-                    type="datetime-local"
-                    value={meetingDetails.endDateTime}
-                    onChange={(e) =>
-                      setMeetingDetails({
-                        ...meetingDetails,
-                        endDateTime: e.target.value,
-                      })
-                    }
-                  />
-                </label>
-                <div className="modal-actions">
-                  <button 
-                    onClick={handleScheduleMeeting}
-                    className="schedule-button"
-                  >
-                    {editingEvent ? "Actualizar" : "Agendar"}
-                  </button>
-                  <button 
-                    onClick={handleCloseModal}
-                    className="cancel-button"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
           <div className="exchange-rate-section container">
             <h2>Tipo de Cambio</h2>
             <div className="exchange-rates">

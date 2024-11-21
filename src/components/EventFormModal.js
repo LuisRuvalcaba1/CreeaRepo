@@ -15,55 +15,15 @@ const EventFormModal = ({
     startDateTime: "",
     endDateTime: "",
     eventType: "meeting",
-    selectedClient: null,
+    attendeeType: "client",
   });
+
   const [clients, setClients] = useState([]);
+  const [advisors, setAdvisors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [advisors, setAdvisors] = useState([]);
-
-  const formatDateTimeForInput = (date) => {
-    if (!date) return "";
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return "";
-
-    // Formatear la fecha manteniendo la zona horaria local
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const hours = String(d.getHours()).padStart(2, "0");
-    const minutes = String(d.getMinutes()).padStart(2, "0");
-
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
-
-  useEffect(() => {
-    if (show && selectedDate) {
-      const startDate = new Date(selectedDate);
-      // Redondear a los próximos 15 minutos sin afectar la zona horaria
-      const minutes = startDate.getMinutes();
-      const roundedMinutes = Math.ceil(minutes / 15) * 15;
-      startDate.setMinutes(roundedMinutes);
-      startDate.setSeconds(0);
-      startDate.setMilliseconds(0);
-
-      const endDate = new Date(startDate);
-      endDate.setHours(endDate.getHours() + 1);
-
-      setFormData((prev) => ({
-        ...prev,
-        startDateTime: formatDateTimeForInput(startDate),
-        endDateTime: formatDateTimeForInput(endDate),
-      }));
-
-      if (userType === "advisor") {
-        loadClients();
-      }
-      if (userType === "promoter") {
-        loadAdvisors();
-      }
-    }
-  }, [show, selectedDate, userType]);
+  const [selectedAdvisor, setSelectedAdvisor] = useState(null);
+  const [selectedClient, setSelectedClient] = useState(null);
 
   const loadAdvisors = async () => {
     try {
@@ -79,75 +39,97 @@ const EventFormModal = ({
     }
   };
 
-  useEffect(() => {
-    if (!show) {
-      setFormData({
-        title: "",
-        startDateTime: "",
-        endDateTime: "",
-        eventType: "meeting",
-        selectedClient: null,
-      });
-      setError("");
-    } else if (initialData?.id) {
-      setFormData({
-        title: initialData.title || "",
-        startDateTime: formatDateTimeForInput(initialData.start) || "",
-        endDateTime: formatDateTimeForInput(initialData.end) || "",
-        eventType: initialData.eventType || "meeting",
-        selectedClient:
-          clients.find((c) => c.id_cliente === initialData.clientId) || null,
-      });
-    }
-  }, [show, initialData, clients]);
-
   const loadClients = async () => {
-    const advisorId = sessionStorage.getItem("userId");
-    if (!advisorId) {
-      setError("No se encontró ID del asesor");
-      return;
-    }
-
     try {
+      const promotorID = sessionStorage.getItem("userId");
       const response = await fetch(
-        `/api/calendar/get-clients-asesor?advisorId=${advisorId}`
+        `/api/calendar/get-clients-asesor?advisorId=${promotorID}`
       );
       if (!response.ok) {
         throw new Error(`Error al cargar clientes: ${response.statusText}`);
       }
       const data = await response.json();
-      setClients(data);
+      setClients(Array.isArray(data) ? data : []);
     } catch (err) {
       setError("Error al cargar la lista de clientes");
       console.error("Error loading clients:", err);
     }
   };
 
-  const validateForm = () => {
-    if (!formData.title.trim()) {
-      throw new Error("El título es obligatorio");
-    }
+  useEffect(() => {
+    if (show) {
+      if (userType === "promoter") {
+        loadClients();
+        loadAdvisors();
+      } else if (userType === "advisor") {
+        loadClients();
+      }
 
-    if (userType === "advisor" && !formData.selectedClient) {
-      throw new Error("Por favor, seleccione un cliente");
-    }
+      if (selectedDate) {
+        const startDate = new Date(selectedDate);
+        const minutes = startDate.getMinutes();
+        const roundedMinutes = Math.ceil(minutes / 15) * 15;
+        startDate.setMinutes(roundedMinutes);
+        startDate.setSeconds(0);
+        startDate.setMilliseconds(0);
 
-    if (!formData.startDateTime || !formData.endDateTime) {
-      throw new Error("Las fechas de inicio y término son obligatorias");
-    }
+        const endDate = new Date(startDate);
+        endDate.setHours(endDate.getHours() + 1);
 
-    const start = new Date(formData.startDateTime);
-    const end = new Date(formData.endDateTime);
-
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      throw new Error("Fechas inválidas");
+        setFormData((prev) => ({
+          ...prev,
+          startDateTime: formatDateTimeForInput(startDate),
+          endDateTime: formatDateTimeForInput(endDate),
+        }));
+      }
     }
+  }, [show, userType, selectedDate]);
 
-    if (start >= end) {
-      throw new Error(
-        "La hora de término debe ser posterior a la hora de inicio"
-      );
+  useEffect(() => {
+    if (!show) {
+      resetForm();
+    } else if (initialData?.id) {
+      setFormData({
+        title: initialData.title || "",
+        startDateTime: formatDateTimeForInput(initialData.start) || "",
+        endDateTime: formatDateTimeForInput(initialData.end) || "",
+        eventType: initialData.eventType || "meeting",
+        attendeeType: initialData.attendeeType || "client",
+      });
+      if (initialData.advisorId) {
+        const advisor = advisors.find((a) => a.id === initialData.advisorId);
+        setSelectedAdvisor(advisor || null);
+      }
+      if (initialData.clientId) {
+        const client = clients.find(
+          (c) => c.id_cliente === initialData.clientId
+        );
+        setSelectedClient(client || null);
+      }
     }
+  }, [show, initialData, clients, advisors]);
+
+  const formatDateTimeForInput = (date) => {
+    if (!date) return "";
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "";
+
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      startDateTime: "",
+      endDateTime: "",
+      eventType: "meeting",
+      attendeeType: "client",
+    });
+    setSelectedClient(null);
+    setSelectedAdvisor(null);
+    setError("");
   };
 
   const handleSave = async () => {
@@ -155,64 +137,79 @@ const EventFormModal = ({
     setLoading(true);
 
     try {
-      validateForm();
-
-      const userId = sessionStorage.getItem("userId");
-      const userEmail = sessionStorage.getItem("userEmail");
-
-      if (!userId) {
-        throw new Error("No se encontró ID del usuario");
+      if (!formData.title) {
+        throw new Error("El título es obligatorio");
       }
 
-      // Crear fechas manteniendo la zona horaria local
-      const startDateTime = new Date(formData.startDateTime);
-      const endDateTime = new Date(formData.endDateTime);
+      if (!formData.startDateTime || !formData.endDateTime) {
+        throw new Error("Las fechas son obligatorias");
+      }
 
+      let endpoint = "";
       let eventData = {
         title: formData.title.trim(),
-        startDateTime: startDateTime.toJSON(),
-        endDateTime: endDateTime.toJSON(),
+        startDateTime: formData.startDateTime,
+        endDateTime: formData.endDateTime,
         eventType: formData.eventType,
-        createdBy: parseInt(userId),
+        createdBy: sessionStorage.getItem("userId"),
       };
 
-      if (userType === "advisor") {
-        eventData = {
-          ...eventData,
-          clientId: formData.selectedClient.id_cliente,
-          attendees: [{ email: formData.selectedClient.correo_electronico }],
-        };
-      } else if (userType === "client") {
-        eventData.clientEmail = userEmail;
+      // Determinar endpoint y datos según el tipo de usuario
+      switch (userType) {
+        case "promoter":
+          endpoint = "/api/calendar/create-event-promotor";
+          if (formData.attendeeType === "client" && selectedClient) {
+            eventData = {
+              ...eventData,
+              attendeeType: "client",
+              events: [
+                {
+                  clientId: selectedClient.id_cliente,
+                  email: selectedClient.correo_electronico,
+                  type: "client",
+                },
+              ],
+            };
+          } else if (formData.attendeeType === "advisor" && selectedAdvisor) {
+            eventData = {
+              ...eventData,
+              attendeeType: "advisor",
+              events: [
+                {
+                  clientId: selectedAdvisor.id,
+                  email: selectedAdvisor.email,
+                  type: "advisor",
+                },
+              ],
+            };
+          } else {
+            throw new Error(
+              `Debe seleccionar un ${
+                formData.attendeeType === "client" ? "cliente" : "asesor"
+              }`
+            );
+          }
+          break;
+
+        case "advisor":
+          endpoint = "/api/calendar/create-event";
+          if (!selectedClient) {
+            throw new Error("Debe seleccionar un cliente");
+          }
+          eventData.clientId = selectedClient.id_cliente;
+          break;
+
+        case "client":
+          endpoint = "/api/calendar/create-event-client";
+          // No se necesitan datos adicionales para clientes
+          break;
+
+        default:
+          throw new Error("Tipo de usuario no válido");
       }
 
-      let response;
-      if (initialData?.id) {
-        response = await fetch(`/api/calendar/update-event/${initialData.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(eventData),
-        });
-      } else {
-        const endpoint =
-          userType === "client"
-            ? "/api/calendar/create-event-client"
-            : "/api/calendar/create-event";
-
-        response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(eventData),
-        });
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Error al procesar el evento");
-      }
-
-      const responseData = await response.json();
-      onSave(responseData.eventData);
+      console.log("Enviando datos:", { endpoint, eventData });
+      await onSave(eventData);
       onClose();
     } catch (err) {
       setError(err.message);
@@ -222,24 +219,92 @@ const EventFormModal = ({
     }
   };
 
-  const handleDelete = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (loading || !initialData?.id) return;
+  const renderClientSelection = () => (
+    <div className="form-group">
+      <label className="form-label">
+        Cliente: <span className="required">*</span>
+      </label>
+      <select
+        className="form-select"
+        value={selectedClient?.id_cliente || ""}
+        onChange={(e) => {
+          const client = clients.find(
+            (c) => c.id_cliente === parseInt(e.target.value)
+          );
+          setSelectedClient(client);
+        }}
+        disabled={loading || initialData?.id}
+      >
+        <option value="">Seleccione un cliente</option>
+        {clients.map((client) => (
+          <option key={client.id_cliente} value={client.id_cliente}>
+            {client.nombre_completo}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 
-    if (window.confirm("¿Estás seguro de que deseas eliminar este evento?")) {
-      setLoading(true);
-      try {
-        onDelete(initialData.id);
-        onClose();
-      } catch (error) {
-        setError("Error al eliminar el evento");
-        console.error("Error:", error);
-      } finally {
-        setLoading(false);
+  const renderAdvisorSelection = () => (
+    <div className="form-group">
+      <label className="form-label">
+        Asesor: <span className="required">*</span>
+      </label>
+      <select
+        className="form-select"
+        value={selectedAdvisor?.id || ""}
+        onChange={(e) => {
+          const advisor = advisors.find(
+            (a) => a.id === parseInt(e.target.value)
+          );
+          setSelectedAdvisor(advisor);
+        }}
+        disabled={loading || initialData?.id}
+      >
+        <option value="">Seleccione un asesor</option>
+        {advisors.map((advisor) => (
+          <option key={advisor.id} value={advisor.id}>
+            {advisor.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
+  const renderAttendeeTypeSelection = () => (
+    <div className="form-group">
+      <label className="form-label">Tipo de Usuario:</label>
+      <select
+        className="form-select"
+        value={formData.attendeeType}
+        onChange={(e) =>
+          setFormData((prev) => ({
+            ...prev,
+            attendeeType: e.target.value,
+          }))
+        }
+        disabled={loading || initialData?.id}
+      >
+        <option value="client">Cliente</option>
+        <option value="advisor">Asesor</option>
+      </select>
+    </div>
+  );
+
+  useEffect(() => {
+    console.log("Modal props received:", { show, initialData, selectedDate });
+    if (show) {
+      if (initialData) {
+        console.log("Setting form data from initialData:", initialData);
+        setFormData({
+          title: initialData.title || "",
+          startDateTime: initialData.startDateTime || "",
+          endDateTime: initialData.endDateTime || "",
+          eventType: initialData.eventType || "meeting",
+        });
       }
     }
-  };
+  }, [show, initialData, selectedDate]);
 
   if (!show) return null;
 
@@ -251,32 +316,18 @@ const EventFormModal = ({
         </h2>
 
         <div className="form-container">
-          {/* Selector de cliente solo para asesores */}
-          {userType === "advisor" && (
-            <div className="form-group">
-              <label className="form-label">
-                Cliente: <span className="required">*</span>
-              </label>
-              <select
-                className="form-select"
-                value={formData.selectedClient?.id_cliente || ""}
-                onChange={(e) => {
-                  const client = clients.find(
-                    (c) => c.id_cliente === parseInt(e.target.value)
-                  );
-                  setFormData((prev) => ({ ...prev, selectedClient: client }));
-                }}
-                disabled={loading}
-              >
-                <option value="">Seleccione un cliente</option>
-                {clients.map((client) => (
-                  <option key={client.id_cliente} value={client.id_cliente}>
-                    {client.nombre_completo}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          {/* Mostrar selector de tipo de usuario solo para promotores */}
+          {userType === "promoter" &&
+            !initialData?.id &&
+            renderAttendeeTypeSelection()}
+
+          {/* Mostrar selección de asesor/cliente según el tipo de usuario */}
+          {userType === "promoter" &&
+            formData.attendeeType === "advisor" &&
+            renderAdvisorSelection()}
+          {((userType === "promoter" && formData.attendeeType === "client") ||
+            userType === "advisor") &&
+            renderClientSelection()}
 
           <div className="form-group">
             <label className="form-label">
@@ -330,74 +381,78 @@ const EventFormModal = ({
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Tipo de Evento:</label>
-            <div className="radio-group">
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  value="meeting"
-                  checked={formData.eventType === "meeting"}
-                  onChange={() =>
-                    setFormData((prev) => ({ ...prev, eventType: "meeting" }))
-                  }
-                  disabled={loading}
-                />
-                <span>Crear Evento con Google Meet</span>
-              </label>
-              <label className="radio-label">
-                <input
-                  type="radio"
-                  value="event"
-                  checked={formData.eventType === "event"}
-                  onChange={() =>
-                    setFormData((prev) => ({ ...prev, eventType: "event" }))
-                  }
-                  disabled={loading}
-                />
-                <span>Crear solo un evento</span>
-              </label>
-            </div>
-          </div>
+          {/* Mostrar selector de tipo de evento solo para asesores y promotores */}
+          {(userType === "advisor" || userType === "promoter") &&
+            !initialData?.id && (
+              <div className="form-group">
+                <label className="form-label">Tipo de Evento:</label>
+                <div className="radio-group">
+                  <label className="radio-label">
+                    <input
+                      type="radio"
+                      value="meeting"
+                      checked={formData.eventType === "meeting"}
+                      onChange={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          eventType: "meeting",
+                        }))
+                      }
+                      disabled={loading}
+                    />
+                    <span>Crear Evento con Google Meet</span>
+                  </label>
+                  <label className="radio-label">
+                    <input
+                      type="radio"
+                      value="event"
+                      checked={formData.eventType === "event"}
+                      onChange={() =>
+                        setFormData((prev) => ({ ...prev, eventType: "event" }))
+                      }
+                      disabled={loading}
+                    />
+                    <span>Crear solo un evento</span>
+                  </label>
+                </div>
+              </div>
+            )}
 
           {error && (
             <div className="error-message">
               <span>⚠️ {error}</span>
             </div>
           )}
+        </div>
 
-          <div className="button-group">
+        <div className="button-group">
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="save-button"
+          >
+            {loading
+              ? "Guardando..."
+              : initialData?.id
+              ? "Actualizar"
+              : "Guardar"}
+          </button>
+          {initialData?.id && (
             <button
-              onClick={handleSave}
+              onClick={() => onDelete(initialData.id)}
               disabled={loading}
-              className="save-button"
+              className="delete-button"
             >
-              {loading
-                ? "Guardando..."
-                : initialData?.id
-                ? "Actualizar"
-                : "Guardar"}
+              {loading ? "Eliminando..." : "Eliminar"}
             </button>
-
-            {initialData?.id && (
-              <button
-                onClick={handleDelete}
-                disabled={loading}
-                className="delete-button"
-                type="button"
-              >
-                {loading ? "Eliminando..." : "Eliminar"}
-              </button>
-            )}
-
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="cancel-button"
-            >
-              Cancelar
-            </button>
-          </div>
+          )}
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="cancel-button"
+          >
+            Cancelar
+          </button>
         </div>
       </div>
     </div>

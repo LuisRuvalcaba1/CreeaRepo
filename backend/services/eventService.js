@@ -66,16 +66,6 @@ async function createEvent(eventDetails) {
     const formattedStartDate = formatDateForMySQL(eventDetails.startDateTime);
     const formattedEndDate = formatDateForMySQL(eventDetails.endDateTime);
 
-    console.log('Fechas originales:', {
-      start: eventDetails.startDateTime,
-      end: eventDetails.endDateTime
-    });
-
-    console.log('Fechas formateadas para MySQL:', {
-      start: formattedStartDate,
-      end: formattedEndDate
-    });
-
     if (eventDetails.eventType === "meeting") {
       try {
         const googleEvent = await createGoogleEvent({
@@ -126,8 +116,9 @@ async function createEvent(eventDetails) {
         meet_link, 
         created_by, 
         client_id,
-        google_event_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        google_event_id,
+        asesor_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?,?)`,
       [
         eventDetails.title,
         formattedStartDate,
@@ -137,6 +128,7 @@ async function createEvent(eventDetails) {
         eventDetails.createdBy,
         clientInfo[0].id_cliente,
         googleEventId,
+        false
       ]
     );
 
@@ -157,9 +149,172 @@ async function createEvent(eventDetails) {
   }
 }
 
+const createEventByPromotor = async(eventDetails) => {
+  const connection = getConnection();
+  console.log("Creando evento por parte del promotor: ", eventDetails);
+
+  try {
+    let meetLink = null;
+    let googleEventId = null;
+    let targetId = null;
+    let targetEmail = null;
+    
+    // Asegurarnos que createdBy sea un número
+    const createdBy = parseInt(eventDetails.createdBy);
+    if (isNaN(createdBy)) {
+      throw new Error("ID del promotor inválido");
+    }
+
+    // Función auxiliar para formatear fechas manteniendo la zona horaria correcta
+    const formatDateForMySQL = (dateString) => {
+      const date = new Date(dateString);
+      
+      // Obtener el offset de la zona horaria en minutos
+      const offset = date.getTimezoneOffset();
+      
+      // Crear una nueva fecha ajustada por el offset
+      const adjustedDate = new Date(date.getTime() - (offset * 60 * 1000));
+      
+      // Extraer los componentes de la fecha
+      const year = adjustedDate.getUTCFullYear();
+      const month = String(adjustedDate.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(adjustedDate.getUTCDate()).padStart(2, '0');
+      const hours = String(adjustedDate.getUTCHours()).padStart(2, '0');
+      const minutes = String(adjustedDate.getUTCMinutes()).padStart(2, '0');
+      const seconds = String(adjustedDate.getUTCSeconds()).padStart(2, '0');
+
+      // Retornar el formato para MySQL
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    };
+
+    // Determinar el tipo de evento y obtener la información correspondiente
+    if (eventDetails.attendeeType === "client") {
+      const clientEvent = eventDetails.events.find(e => e.type === 'client');
+      if (!clientEvent) {
+        throw new Error("Información del cliente no proporcionada");
+      }
+
+      const [clientInfo] = await connection.query(
+        `SELECT c.id_cliente, c.nombre_completo as client_name,
+                u.correo_electronico as client_email
+         FROM cliente c
+         JOIN usuario u ON c.id_usuario = u.id_usuario
+         WHERE c.id_cliente = ?`,
+        [clientEvent.clientId]
+      );
+
+      if (!clientInfo || clientInfo.length === 0) {
+        throw new Error(`No se encontró la información del cliente con ID ${clientEvent.clientId}`);
+      }
+
+      targetId = clientInfo[0].id_cliente;
+      targetEmail = clientInfo[0].client_email;
+    } else if (eventDetails.attendeeType === "advisor") {
+      const advisorEvent = eventDetails.events.find(e => e.type === 'advisor');
+      if (!advisorEvent) {
+        throw new Error("Información del asesor no proporcionada");
+      }
+
+      const [advisorInfo] = await connection.query(
+        `SELECT a.id_asesor, a.nombre_completo as advisor_name,
+                u.correo_electronico as advisor_email
+         FROM asesor a
+         JOIN usuario u ON a.id_usuario = u.id_usuario
+         WHERE a.id_usuario = ?`,
+        [advisorEvent.clientId]
+      );
+
+      if (!advisorInfo || advisorInfo.length === 0) {
+        throw new Error(`No se encontró la información del asesor con ID ${advisorEvent.clientId}`);
+      }
+
+      targetId = advisorInfo[0].id_asesor;
+      targetEmail = advisorInfo[0].advisor_email;
+    }
+
+    // Formatear fechas usando la nueva función
+    const formattedStartDate = formatDateForMySQL(eventDetails.startDateTime);
+    const formattedEndDate = formatDateForMySQL(eventDetails.endDateTime);
+
+    // Crear evento en Google Calendar si es necesario
+    if (eventDetails.eventType === "meeting") {
+      try {
+        const attendees = eventDetails.events.map(event => ({ email: event.email }));
+        
+        const googleEvent = await createGoogleEvent({
+          title: eventDetails.title,
+          startDateTime: eventDetails.startDateTime,
+          endDateTime: eventDetails.endDateTime,
+          attendees
+        });
+
+        meetLink = googleEvent.meetLink;
+        googleEventId = googleEvent.googleEventId;
+
+        // Enviar correos de confirmación
+        for (const attendee of eventDetails.events) {
+          await enviarConfirmacionCita({
+            to: attendee.email,
+            eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
+            eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
+            link: meetLink,
+            participantName: "el promotor",
+            hostName: "El promotor",
+            isHost: false
+          });
+        }
+      } catch (error) {
+        console.error("Error al crear evento en Google:", error);
+        throw new Error("No se pudo crear el evento en Google Calendar");
+      }
+    }
+
+    // Insertar en la base de datos
+    const [result] = await connection.query(
+      `INSERT INTO events (
+        title, 
+        start_datetime, 
+        end_datetime, 
+        event_type, 
+        meet_link, 
+        created_by, 
+        client_id,
+        google_event_id,
+        asesor_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        eventDetails.title,
+        formattedStartDate,
+        formattedEndDate,
+        eventDetails.eventType,
+        meetLink,
+        createdBy,
+        eventDetails.attendeeType === "client" ? targetId : null,
+        googleEventId,
+        eventDetails.attendeeType === "advisor" ? targetId : false
+      ]
+    );
+
+    return {
+      id: result.insertId,
+      title: eventDetails.title,
+      start: formattedStartDate,
+      end: formattedEndDate,
+      eventType: eventDetails.eventType,
+      clientId: eventDetails.attendeeType === "client" ? targetId : null,
+      advisorId: eventDetails.attendeeType === "advisor" ? targetId : false,
+      meetLink,
+      createdBy,
+      googleEventId,
+    };
+  } catch (error) {
+    console.error("Error al crear evento:", error);
+    throw error;
+  }
+};
+
 const createEventByClient = async (eventDetails) => {
   const connection = getConnection();
-  console.log("Creando evento de cliente con detalles:", eventDetails);
 
   try {
     // Obtener información del cliente y su asesor asignado
@@ -310,7 +465,6 @@ const getAdvisors = async () => {
       WHERE u.tipo_usuario = 'asesor'
       ORDER BY a.nombre_completo ASC`
     );
-    console.log(advisors);
     return advisors;
   } catch (error) {
     console.error("Error al obtener asesores:", error);
@@ -483,70 +637,137 @@ const getEventsByUser = async (userId) => {
 async function updateEvent(eventId, eventDetails) {
   const connection = getConnection();
   try {
-    // Crear fechas sin ajuste de zona horaria
-    const startDate = new Date(eventDetails.startDateTime);
-    const endDate = new Date(eventDetails.endDateTime);
-    
-    // Formatear las fechas manteniendo la zona horaria original
-    const formattedStartDate = startDate.getFullYear() + '-' +
-      String(startDate.getMonth() + 1).padStart(2, '0') + '-' +
-      String(startDate.getDate()).padStart(2, '0') + ' ' +
-      String(startDate.getHours()).padStart(2, '0') + ':' +
-      String(startDate.getMinutes()).padStart(2, '0') + ':' +
-      String(startDate.getSeconds()).padStart(2, '0');
-
-    const formattedEndDate = endDate.getFullYear() + '-' +
-      String(endDate.getMonth() + 1).padStart(2, '0') + '-' +
-      String(endDate.getDate()).padStart(2, '0') + ' ' +
-      String(endDate.getHours()).padStart(2, '0') + ':' +
-      String(endDate.getMinutes()).padStart(2, '0') + ':' +
-      String(endDate.getSeconds()).padStart(2, '0');
-
-    console.log('Actualizando evento con fechas:', {
-      start: formattedStartDate,
-      end: formattedEndDate
-    });
-
-    let clientId = null;
-    if (["client", "both"].includes(eventDetails.attendeeType)) {
-      clientId = eventDetails.clientId;
-    } else if (eventDetails.attendeeType === "advisor") {
-      clientId = eventDetails.advisorId;
-    }
-
-    const [result] = await connection.query(
-      `UPDATE events SET 
-        title = ?,
-        start_datetime = ?,
-        end_datetime = ?,
-        event_type = ?,
-        meet_link = ?,
-        client_id = ?
-      WHERE id = ?`,
-      [
-        eventDetails.title,
-        formattedStartDate,
-        formattedEndDate,
-        eventDetails.eventType,
-        eventDetails.meetLink,
-        clientId,
-        eventId,
-      ]
+    // Obtener el evento actual y el tipo de usuario
+    const [currentEvent] = await connection.query(
+      'SELECT e.*, u.tipo_usuario FROM events e ' +
+      'JOIN usuario u ON e.created_by = u.id_usuario ' +
+      'WHERE e.id = ?',
+      [eventId]
     );
 
-    if (result.affectedRows === 0) {
-      throw new Error("No se pudo actualizar el evento");
+    if (!currentEvent.length) {
+      throw new Error('Evento no encontrado');
     }
 
+    const isClientUser = currentEvent[0].tipo_usuario === 'cliente';
+
+    // Función auxiliar para formatear fechas manteniendo la zona horaria correcta
+    const formatDateForMySQL = (dateString) => {
+      const date = new Date(dateString);
+      
+      // Obtener el offset de la zona horaria en minutos
+      const offset = date.getTimezoneOffset();
+      
+      // Crear una nueva fecha ajustada por el offset
+      const adjustedDate = new Date(date.getTime() - (offset * 60 * 1000));
+      
+      // Extraer los componentes de la fecha
+      const year = adjustedDate.getUTCFullYear();
+      const month = String(adjustedDate.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(adjustedDate.getUTCDate()).padStart(2, '0');
+      const hours = String(adjustedDate.getUTCHours()).padStart(2, '0');
+      const minutes = String(adjustedDate.getUTCMinutes()).padStart(2, '0');
+      const seconds = String(adjustedDate.getUTCSeconds()).padStart(2, '0');
+
+      // Retornar el formato para MySQL
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    };
+
+    // Formatear las fechas usando la nueva función
+    const formattedStartDate = formatDateForMySQL(eventDetails.startDateTime);
+    const formattedEndDate = formatDateForMySQL(eventDetails.endDateTime);
+
+    // Si el evento es de tipo meeting y tiene un Google Event ID, actualizarlo
+    if (currentEvent[0].google_event_id && currentEvent[0].event_type === 'meeting') {
+      // Obtener información de los participantes
+      const [clientInfo] = await connection.query(
+        `SELECT c.nombre_completo as client_name, u.correo_electronico as client_email
+         FROM cliente c
+         JOIN usuario u ON c.id_usuario = u.id_usuario
+         WHERE c.id_cliente = ?`,
+        [currentEvent[0].client_id]
+      );
+
+      const [advisorInfo] = await connection.query(
+        `SELECT a.nombre_completo as advisor_name, u.correo_electronico as advisor_email
+         FROM asesor a
+         JOIN usuario u ON a.id_usuario = u.id_usuario
+         WHERE a.id_usuario = ?`,
+        [currentEvent[0].created_by]
+      );
+
+      if (clientInfo.length && advisorInfo.length) {
+        await updateGoogleEvent(currentEvent[0].google_event_id, {
+          title: eventDetails.title || currentEvent[0].title,
+          startDateTime: new Date(eventDetails.startDateTime).toISOString(),
+          endDateTime: new Date(eventDetails.endDateTime).toISOString(),
+          attendees: [
+            { email: clientInfo[0].client_email },
+            { email: advisorInfo[0].advisor_email }
+          ]
+        });
+      }
+    }
+
+    let query;
+    let queryParams;
+
+    if (isClientUser) {
+      // Si es cliente, solo actualizar título y fechas
+      query = `
+        UPDATE events 
+        SET title = ?,
+            start_datetime = ?,
+            end_datetime = ?
+        WHERE id = ?
+      `;
+      queryParams = [
+        eventDetails.title || currentEvent[0].title,
+        formattedStartDate,
+        formattedEndDate,
+        eventId
+      ];
+    } else {
+      // Si es asesor o promotor, permitir actualizar todos los campos
+      query = `
+        UPDATE events 
+        SET title = ?,
+            start_datetime = ?,
+            end_datetime = ?,
+            event_type = ?,
+            client_id = ?
+        WHERE id = ?
+      `;
+      queryParams = [
+        eventDetails.title || currentEvent[0].title,
+        formattedStartDate,
+        formattedEndDate,
+        eventDetails.eventType || currentEvent[0].event_type,
+        eventDetails.clientId || currentEvent[0].client_id,
+        eventId
+      ];
+    }
+
+    const [result] = await connection.query(query, queryParams);
+
+    if (result.affectedRows === 0) {
+      throw new Error('No se pudo actualizar el evento');
+    }
+
+    // Retornar el evento actualizado con los campos apropiados
     return {
       id: eventId,
-      ...eventDetails,
+      title: eventDetails.title || currentEvent[0].title,
       start: formattedStartDate,
       end: formattedEndDate,
-      clientId,
+      eventType: currentEvent[0].event_type,
+      clientId: currentEvent[0].client_id,
+      createdBy: currentEvent[0].created_by,
+      meetLink: currentEvent[0].meet_link,
+      googleEventId: currentEvent[0].google_event_id
     };
   } catch (error) {
-    console.error("Error al actualizar evento:", error);
+    console.error('Error al actualizar evento:', error);
     throw error;
   }
 }
@@ -611,4 +832,5 @@ module.exports = {
   getClientsByUserType,
   getAllClients,
   createEventByClient,
+  createEventByPromotor
 };
