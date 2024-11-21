@@ -94,8 +94,6 @@ const PromoterDashboard = () => {
 
 
   const handleSaveEvent = async (formData) => {
-    console.log("Datos recibidos del modal:", formData);
-    
     if (!formData.title || !formData.startDateTime || !formData.endDateTime) {
       alert("Por favor, complete todos los campos obligatorios.");
       return;
@@ -103,26 +101,23 @@ const PromoterDashboard = () => {
   
     try {
       if (selectedEvent) {
-        // Si es una actualización, solo enviamos los campos editables
         const updateData = {
           title: formData.title,
           startDateTime: formData.startDateTime,
           endDateTime: formData.endDateTime,
-          // Mantenemos los valores originales para estos campos
           eventType: selectedEvent.eventType,
           attendeeType: selectedEvent.attendeeType,
           clientId: selectedEvent.clientId,
           createdBy: promotorID,
         };
   
-        await axios.put(
-          `/api/calendar/update-event/${selectedEvent.id}`,
-          updateData
-        );
-        alert("Evento actualizado exitosamente.");
+        const response = await axios.put(`/api/calendar/update-event/${selectedEvent.id}`, updateData);
+        if (response.data) {
+          alert("Evento actualizado exitosamente.");
+          window.location.reload();
+        }
       } else {
-        // Si es un nuevo evento
-        let eventData = {
+        const eventData = {
           title: formData.title,
           startDateTime: formData.startDateTime,
           endDateTime: formData.endDateTime,
@@ -132,24 +127,19 @@ const PromoterDashboard = () => {
           events: formData.events
         };
   
-        const response = await axios.post(
-          "/api/calendar/create-event-promotor",
-          eventData
-        );
+        const response = await axios.post("/api/calendar/create-event-promotor", eventData);
         if (response.data) {
           alert("Evento creado exitosamente");
+          window.location.reload();
         }
       }
   
-      await fetchEvents();
       setIsModalOpen(false);
-      resetForm();
+      setSelectedEvent(null);
+      setSelectedDate(null);
     } catch (error) {
       console.error("Error al guardar el evento:", error);
-      alert(
-        "Error al guardar el evento: " +
-          (error.response?.data?.error || error.message)
-      );
+      alert("Error al guardar el evento: " + (error.response?.data?.error || error.message));
     }
   };
 
