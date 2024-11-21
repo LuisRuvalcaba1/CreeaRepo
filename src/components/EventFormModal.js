@@ -145,29 +145,27 @@ const EventFormModal = ({
         throw new Error("Las fechas son obligatorias");
       }
   
-      // Validaciones específicas según el tipo de usuario
-      if (userType === "advisor" && !selectedClient) {
-        throw new Error("Debe seleccionar un cliente");
-      }
-  
-      if (userType === "promoter" && formData.attendeeType === "client" && !selectedClient) {
-        throw new Error("Debe seleccionar un cliente");
-      }
-  
-      if (userType === "promoter" && formData.attendeeType === "advisor" && !selectedAdvisor) {
-        throw new Error("Debe seleccionar un asesor");
-      }
-  
       const eventData = {
         title: formData.title.trim(),
         startDateTime: formData.startDateTime,
-        endDateTime: formData.endDateTime,
-        eventType: formData.eventType,
-        attendeeType: formData.attendeeType,
-        clientId: selectedClient?.id_cliente,
-        advisorId: selectedAdvisor?.id,
-        createdBy: sessionStorage.getItem("userId")
+        endDateTime: formData.endDateTime
       };
+  
+      if (initialData?.id) {
+        // Update existing event
+        const response = await fetch(`/api/calendar/update-event/${initialData.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(eventData)
+        });
+  
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.details || "Error al actualizar el evento");
+        }
+      } 
   
       await onSave(eventData);
       resetForm();

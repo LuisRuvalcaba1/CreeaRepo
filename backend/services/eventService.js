@@ -366,9 +366,8 @@ const createEventByClient = async (eventDetails) => {
         meetLink = googleEvent.meetLink;
         googleEventId = googleEvent.googleEventId;
 
-        console.log("Enviando correo de confirmación al cliente...");
         // Enviar correo al cliente (creador del evento)
-        const clientEmailResult = await enviarConfirmacionCita({
+        await enviarConfirmacionCita({
           to: client_email,
           eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
           eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
@@ -378,9 +377,8 @@ const createEventByClient = async (eventDetails) => {
           isHost: true
         });
 
-        console.log("Enviando correo de confirmación al asesor...");
         // Enviar correo al asesor
-        const advisorEmailResult = await enviarConfirmacionCita({
+        await enviarConfirmacionCita({
           to: advisor_email,
           eventDate: new Date(eventDetails.startDateTime).toLocaleDateString(),
           eventTime: new Date(eventDetails.startDateTime).toLocaleTimeString(),
@@ -396,11 +394,7 @@ const createEventByClient = async (eventDetails) => {
       }
     }
 
-    // Formatear las fechas para MySQL manteniendo la zona horaria original
-    const formattedStartDate = new Date(eventDetails.startDateTime).toISOString().replace('T', ' ').slice(0, 19);
-const formattedEndDate = new Date(eventDetails.endDateTime).toISOString().replace('T', ' ').slice(0, 19);
-
-    console.log("Guardando evento en la base de datos...");
+    // Insertar evento en la base de datos usando las fechas sin modificar
     const [result] = await connection.query(
       `INSERT INTO events (
         title, 
@@ -415,23 +409,22 @@ const formattedEndDate = new Date(eventDetails.endDateTime).toISOString().replac
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         eventDetails.title,
-        formattedStartDate,
-        formattedEndDate,
+        eventDetails.startDateTime,
+        eventDetails.endDateTime,
         eventDetails.eventType,
         meetLink,
         eventDetails.createdBy,
-        null,  // client_id ahora es null
-        id_asesor, 
+        id_cliente,
+        id_asesor,
         googleEventId
       ]
     );
 
-    console.log("Evento creado exitosamente");
     return {
       id: result.insertId,
       title: eventDetails.title,
-      start: formattedStartDate,
-      end: formattedEndDate,
+      start: eventDetails.startDateTime,
+      end: eventDetails.endDateTime,
       eventType: eventDetails.eventType,
       clientId: id_cliente,
       advisorId: id_asesor,
@@ -439,6 +432,7 @@ const formattedEndDate = new Date(eventDetails.endDateTime).toISOString().replac
       createdBy: eventDetails.createdBy,
       googleEventId
     };
+
   } catch (error) {
     console.error("Error al crear evento:", error);
     throw error;

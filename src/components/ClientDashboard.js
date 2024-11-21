@@ -179,13 +179,11 @@ const ClientDashboard = () => {
 
   const handleSaveEvent = async (formData) => {
     try {
-      const startDate = new Date(formData.startDateTime);
-      const endDate = new Date(formData.endDateTime);
-  
+      // Creamos las fechas directamente desde el input sin modificaciones
       const eventData = {
         ...formData,
-        startDateTime: startDate.toISOString(),
-        endDateTime: endDate.toISOString(),
+        startDateTime: formData.startDateTime,  // Mantener la hora exacta del input
+        endDateTime: formData.endDateTime,      // Mantener la hora exacta del input
         createdBy: parseInt(clientId),
         eventType: formData.eventType || "meeting",
       };
@@ -214,7 +212,7 @@ const ClientDashboard = () => {
       throw error;
     }
   };
-
+  
   const handleDeleteEvent = async (eventId) => {
     // Si recibimos un objeto en lugar de un ID, extraemos el ID
     const id = typeof eventId === "object" ? eventId.id : eventId;
