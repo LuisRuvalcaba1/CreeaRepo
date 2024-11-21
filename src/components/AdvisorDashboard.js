@@ -156,42 +156,22 @@ const AdvisorDashboard = () => {
 
   const fetchEvents = async () => {
     try {
-      const response = await axios.get(
-        `/api/calendar/get-events?advisorId=${advisorId}`
-      );
-
-      // Ajustar las fechas al mostrarlas
-      const processedEvents = response.data.map((event) => ({
+      const response = await axios.get(`/api/calendar/get-advisor-events?advisorId=${advisorId}`);
+      const processedEvents = response.data.map(event => ({
         id: event.id,
         title: event.title,
         start: new Date(event.start),
         end: new Date(event.end),
         clientId: event.client_id,
-        clientName: event.client_name,
+        advisorId: event.asesor_id,
+        creatorName: event.creator_name,
+        creatorType: event.creator_type,
+        participantName: event.participant_name,
+        participantType: event.participant_type,
         eventType: event.event_type,
-        meetLink: event.meet_link,
+        meetLink: event.meet_link
       }));
-
       setEvents(processedEvents);
-
-      // Procesar notificaciones de eventos próximos
-      const upcomingEvents = processedEvents.filter((event) => {
-        const eventDate = new Date(event.start);
-        const now = new Date();
-        const oneDayAhead = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        return eventDate >= now && eventDate <= oneDayAhead;
-      });
-
-      const newEvents = upcomingEvents.filter(
-        (event) => !notifiedEvents.some((notified) => notified.id === event.id)
-      );
-
-      if (newEvents.length > 0) {
-        alert(
-          `Tienes ${newEvents.length} eventos programados en las próximas 24 horas.`
-        );
-        setNotifiedEvents([...notifiedEvents, ...newEvents]);
-      }
     } catch (error) {
       console.error("Error al obtener eventos:", error);
     }

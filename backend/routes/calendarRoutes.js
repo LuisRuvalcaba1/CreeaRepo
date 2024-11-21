@@ -9,6 +9,7 @@ const {
   getAdvisors,
   createEventByClient,
   createEventByPromotor,
+  getAdvisorEvents,
   blockTimeInterval,
   getUpcomingBirthdays,
 } = require("../services/eventService"); // Servicio para la base de datos
@@ -109,6 +110,40 @@ router.post("/create-event-promotor", async (req, res) => {
       error: "Error al crear el evento",
       details: error.message
     });
+  }
+});
+
+
+// Obtener eventos por asesor
+router.get("/get-advisor-events", async (req, res) => {
+  const { advisorId } = req.query;
+
+  if (!advisorId) {
+    return res.status(400).json({ error: "Falta el parámetro advisorId" });
+  }
+
+  try {
+    const events = await getAdvisorEvents(advisorId);
+    
+    if (!events || events.length === 0) {
+      return res.status(404).json({ 
+        message: "No se encontraron eventos para este asesor." 
+      });
+    }
+
+    // Formatear las fechas para la respuesta
+    const formattedEvents = events.map(event => ({
+      ...event,
+      start: new Date(event.start_datetime),
+      end: new Date(event.end_datetime),
+      start_datetime: undefined,
+      end_datetime: undefined
+    }));
+
+    res.status(200).json(formattedEvents);
+  } catch (error) {
+    console.error("Error al obtener eventos:", error);
+    res.status(500).json({ error: "Error al obtener eventos." });
   }
 });
 

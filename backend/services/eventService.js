@@ -419,8 +419,9 @@ const createEventByClient = async (eventDetails) => {
         meet_link, 
         created_by, 
         client_id, 
+        asesor_id,
         google_event_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         eventDetails.title,
         formattedStartDate,
@@ -428,7 +429,8 @@ const createEventByClient = async (eventDetails) => {
         eventDetails.eventType,
         meetLink,
         eventDetails.createdBy,
-        id_cliente,  // Usando id_cliente para el registro
+        null,  // client_id ahora es null
+        id_asesor, 
         googleEventId
       ]
     );
@@ -451,6 +453,52 @@ const createEventByClient = async (eventDetails) => {
     throw error;
   }
 };
+
+async function getAdvisorEvents(advisorId) {
+  const connection = getConnection();
+
+  try {
+    // Obtener el id_asesor del usuario
+    const [advisorInfo] = await connection.query(
+      `SELECT id_asesor FROM asesor WHERE id_usuario = ?`,
+      [advisorId]
+    );
+
+    if (!advisorInfo.length) {
+      throw new Error("Asesor no encontrado");
+    }
+
+    const id_asesor = advisorInfo[0].id_asesor;
+
+    // Consulta de eventos
+    const query = `
+      SELECT 
+        e.*,
+        COALESCE(c.nombre_completo, a2.nombre_completo) as participant_name,
+        CASE 
+          WHEN e.client_id IS NOT NULL THEN 'client'
+          WHEN e.asesor_id IS NOT NULL THEN 'advisor'
+        END as participant_type,
+        a_creator.nombre_completo as creator_name,
+        u_creator.tipo_usuario as creator_type
+      FROM events e
+      LEFT JOIN cliente c ON e.client_id = c.id_cliente
+      LEFT JOIN asesor a2 ON e.asesor_id = a2.id_asesor
+      LEFT JOIN usuario u_creator ON e.created_by = u_creator.id_usuario
+      LEFT JOIN asesor a_creator ON u_creator.id_usuario = a_creator.id_usuario
+      WHERE e.asesor_id = ? 
+      OR e.created_by = ?
+      ORDER BY e.start_datetime DESC
+    `;
+
+    const [events] = await connection.query(query, [id_asesor, advisorId]);
+    return events;
+    
+  } catch (error) {
+    console.error("Error al obtener eventos del asesor:", error);
+    throw error;
+  }
+}
 
 const getAdvisors = async () => {
   const connection = getConnection();
@@ -832,5 +880,6 @@ module.exports = {
   getClientsByUserType,
   getAllClients,
   createEventByClient,
-  createEventByPromotor
+  createEventByPromotor,
+  getAdvisorEvents
 };
