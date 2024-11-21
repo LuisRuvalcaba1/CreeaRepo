@@ -7,8 +7,6 @@ const { createGoogleEvent, updateGoogleEvent, deleteGoogleEvent } = require('../
 async function createEvent(eventDetails) {
     const connection = getConnection();
     let googleEvent = {};
-
-    // Validar datos antes de continuar
     if (!eventDetails.title || !eventDetails.startDateTime || !eventDetails.endDateTime) {
         throw new Error('Faltan campos obligatorios para crear el evento.');
     }
