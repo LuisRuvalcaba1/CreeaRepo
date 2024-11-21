@@ -68,60 +68,40 @@ const ClientDashboard = () => {
   };
 
   const handleOpenModal = (event = null, start = null) => {
-    console.log('handleOpenModal called with:', { event, start });
-    
     if (event) {
-      console.log('Existing event:', event);
       setSelectedEvent({
         ...event,
         startDateTime: formatDateTimeForInput(event.start),
         endDateTime: formatDateTimeForInput(event.end),
       });
     } else if (start) {
-      console.log('New event start date:', start);
       const startDate = new Date(start);
       const endDate = new Date(start);
-      endDate.setHours(startDate.getHours() + 1); // Añadir una hora para la fecha final
-  
-      // Asegurarnos de mantener la hora seleccionada del calendario
-      const clickedHour = startDate.getHours();
-      const clickedMinutes = startDate.getMinutes();
-  
-      // Formatear manteniendo la hora exacta que se clickeó
-      const formattedStart = formatDateTimeForInput(startDate, clickedHour, clickedMinutes);
-      const formattedEnd = formatDateTimeForInput(endDate, clickedHour + 1, clickedMinutes);
-      
-      console.log('Formatted start date:', formattedStart);
-      console.log('Formatted end date:', formattedEnd);
+      endDate.setHours(startDate.getHours() + 1);
+      endDate.setMinutes(startDate.getMinutes());
   
       setSelectedEvent({
         title: '',
-        startDateTime: formattedStart,
-        endDateTime: formattedEnd,
+        startDateTime: formatDateTimeForInput(startDate),
+        endDateTime: formatDateTimeForInput(endDate)
       });
     }
     setIsModalOpen(true);
   };
   
-  // Función modificada para manejar horas específicas
-  const formatDateTimeForInput = (date, specificHour = null, specificMinutes = null) => {
+  const formatDateTimeForInput = (date) => {
     if (!date) return '';
     const d = new Date(date);
     if (isNaN(d.getTime())) return '';
     
-    // Usar las horas y minutos específicos si se proporcionan
-    const hours = specificHour !== null ? specificHour : d.getHours();
-    const minutes = specificMinutes !== null ? specificMinutes : d.getMinutes();
-    
-    // Formatear fecha manteniendo la hora exacta
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
-    const formattedHours = String(hours).padStart(2, '0');
-    const formattedMinutes = String(minutes).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
     
-    return `${year}-${month}-${day}T${formattedHours}:${formattedMinutes}`;
-  };
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };  
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
@@ -184,21 +164,32 @@ const ClientDashboard = () => {
 
   const handleEventEdit = async (eventData) => {
     try {
-      await axios.put(`/api/calendar/update-event/${eventData.id}`, eventData);
-      await fetchEvents();
+      const eventId = eventData.id;
+      if (!eventId) {
+        throw new Error("ID del evento no encontrado");
+      }
+  
+      await axios.put(`/api/calendar/update-event/${eventId}`, eventData);
+      await fetchEvents(); // Recargar eventos después de actualizar
     } catch (error) {
       console.error("Error al actualizar el evento:", error);
+      throw error;
     }
   };
 
   const handleSaveEvent = async (formData) => {
     try {
+      const startDate = new Date(formData.startDateTime);
+      const endDate = new Date(formData.endDateTime);
+  
       const eventData = {
         ...formData,
+        startDateTime: startDate.toISOString(),
+        endDateTime: endDate.toISOString(),
         createdBy: parseInt(clientId),
         eventType: formData.eventType || "meeting",
       };
-
+  
       const response = await fetch("/api/calendar/create-event-client", {
         method: "POST",
         headers: {
@@ -206,17 +197,17 @@ const ClientDashboard = () => {
         },
         body: JSON.stringify(eventData),
       });
-
+  
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.details || "Error al crear el evento");
       }
-
+  
       const data = await response.json();
-      await fetchEvents(); // Recargar eventos inmediatamente
-      setIsModalOpen(false); // Cerrar el modal después de guardar
-      setSelectedEvent(null); // Limpiar el evento seleccionado
-      setSelectedDate(null); // Limpiar la fecha seleccionada
+      await fetchEvents();
+      setIsModalOpen(false);
+      setSelectedEvent(null);
+      setSelectedDate(null);
       return data;
     } catch (error) {
       console.error("Error al guardar el evento:", error);
@@ -349,6 +340,7 @@ const ClientDashboard = () => {
                 setSelectedEvent(null);
               }}
               onSave={handleSaveEvent}
+              onUpdate={handleEventEdit}
               onDelete={handleDeleteEvent}
               initialData={selectedEvent} // Ahora contiene startDateTime y endDateTime formateados
               userType="client"

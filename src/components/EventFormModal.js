@@ -135,81 +135,41 @@ const EventFormModal = ({
   const handleSave = async () => {
     setError("");
     setLoading(true);
-
+  
     try {
       if (!formData.title) {
         throw new Error("El título es obligatorio");
       }
-
+  
       if (!formData.startDateTime || !formData.endDateTime) {
         throw new Error("Las fechas son obligatorias");
       }
-
-      let endpoint = "";
-      let eventData = {
+  
+      const eventData = {
         title: formData.title.trim(),
         startDateTime: formData.startDateTime,
-        endDateTime: formData.endDateTime,
-        eventType: formData.eventType,
-        createdBy: sessionStorage.getItem("userId"),
+        endDateTime: formData.endDateTime
       };
-
-      // Determinar endpoint y datos según el tipo de usuario
-      switch (userType) {
-        case "promoter":
-          endpoint = "/api/calendar/create-event-promotor";
-          if (formData.attendeeType === "client" && selectedClient) {
-            eventData = {
-              ...eventData,
-              attendeeType: "client",
-              events: [
-                {
-                  clientId: selectedClient.id_cliente,
-                  email: selectedClient.correo_electronico,
-                  type: "client",
-                },
-              ],
-            };
-          } else if (formData.attendeeType === "advisor" && selectedAdvisor) {
-            eventData = {
-              ...eventData,
-              attendeeType: "advisor",
-              events: [
-                {
-                  clientId: selectedAdvisor.id,
-                  email: selectedAdvisor.email,
-                  type: "advisor",
-                },
-              ],
-            };
-          } else {
-            throw new Error(
-              `Debe seleccionar un ${
-                formData.attendeeType === "client" ? "cliente" : "asesor"
-              }`
-            );
-          }
-          break;
-
-        case "advisor":
-          endpoint = "/api/calendar/create-event";
-          if (!selectedClient) {
-            throw new Error("Debe seleccionar un cliente");
-          }
-          eventData.clientId = selectedClient.id_cliente;
-          break;
-
-        case "client":
-          endpoint = "/api/calendar/create-event-client";
-          // No se necesitan datos adicionales para clientes
-          break;
-
-        default:
-          throw new Error("Tipo de usuario no válido");
+  
+      if (initialData?.id) {
+        // Update existing event
+        const response = await fetch(`/api/calendar/update-event/${initialData.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(eventData)
+        });
+  
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.details || "Error al actualizar el evento");
+        }
+      } else {
+        // Create new event
+        await onSave(eventData);
       }
-
-      console.log("Enviando datos:", { endpoint, eventData });
-      await onSave(eventData);
+  
       onClose();
     } catch (err) {
       setError(err.message);

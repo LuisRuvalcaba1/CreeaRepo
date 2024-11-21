@@ -378,8 +378,6 @@ const createEventByClient = async (eventDetails) => {
           isHost: true
         });
 
-        console.log("Resultado envío correo cliente:", clientEmailResult);
-
         console.log("Enviando correo de confirmación al asesor...");
         // Enviar correo al asesor
         const advisorEmailResult = await enviarConfirmacionCita({
@@ -392,22 +390,15 @@ const createEventByClient = async (eventDetails) => {
           isHost: false
         });
 
-        console.log("Resultado envío correo asesor:", advisorEmailResult);
-
       } catch (error) {
         console.error("Error al crear evento en Google o enviar correos:", error);
         throw new Error("No se pudo crear el evento en Google Calendar o enviar las notificaciones");
       }
     }
 
-    const formattedStartDate = new Date(eventDetails.startDateTime)
-      .toISOString()
-      .slice(0, 19)
-      .replace("T", " ");
-    const formattedEndDate = new Date(eventDetails.endDateTime)
-      .toISOString()
-      .slice(0, 19)
-      .replace("T", " ");
+    // Formatear las fechas para MySQL manteniendo la zona horaria original
+    const formattedStartDate = new Date(eventDetails.startDateTime).toISOString().replace('T', ' ').slice(0, 19);
+const formattedEndDate = new Date(eventDetails.endDateTime).toISOString().replace('T', ' ').slice(0, 19);
 
     console.log("Guardando evento en la base de datos...");
     const [result] = await connection.query(
@@ -682,8 +673,10 @@ const getEventsByUser = async (userId) => {
 /**
  * Actualizar un evento en la base de datos y en Google Calendar
  */
-async function updateEvent(eventId, eventDetails) {
+const updateEvent = async (eventId, eventDetails) => {
   const connection = getConnection();
+  console.log("Actualizando evento:", { eventId, eventDetails });
+
   try {
     // Obtener el evento actual y el tipo de usuario
     const [currentEvent] = await connection.query(
@@ -697,19 +690,12 @@ async function updateEvent(eventId, eventDetails) {
       throw new Error('Evento no encontrado');
     }
 
-    const isClientUser = currentEvent[0].tipo_usuario === 'cliente';
-
     // Función auxiliar para formatear fechas manteniendo la zona horaria correcta
     const formatDateForMySQL = (dateString) => {
       const date = new Date(dateString);
-      
-      // Obtener el offset de la zona horaria en minutos
       const offset = date.getTimezoneOffset();
-      
-      // Crear una nueva fecha ajustada por el offset
       const adjustedDate = new Date(date.getTime() - (offset * 60 * 1000));
       
-      // Extraer los componentes de la fecha
       const year = adjustedDate.getUTCFullYear();
       const month = String(adjustedDate.getUTCMonth() + 1).padStart(2, '0');
       const day = String(adjustedDate.getUTCDate()).padStart(2, '0');
@@ -717,17 +703,16 @@ async function updateEvent(eventId, eventDetails) {
       const minutes = String(adjustedDate.getUTCMinutes()).padStart(2, '0');
       const seconds = String(adjustedDate.getUTCSeconds()).padStart(2, '0');
 
-      // Retornar el formato para MySQL
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     };
 
-    // Formatear las fechas usando la nueva función
+    // Formatear las fechas usando la función
     const formattedStartDate = formatDateForMySQL(eventDetails.startDateTime);
     const formattedEndDate = formatDateForMySQL(eventDetails.endDateTime);
 
-    // Si el evento es de tipo meeting y tiene un Google Event ID, actualizarlo
+    // Si el evento tiene Google Calendar ID, actualizarlo
     if (currentEvent[0].google_event_id && currentEvent[0].event_type === 'meeting') {
-      // Obtener información de los participantes
+      // Obtener información actualizada de los participantes
       const [clientInfo] = await connection.query(
         `SELECT c.nombre_completo as client_name, u.correo_electronico as client_email
          FROM cliente c
@@ -757,68 +742,47 @@ async function updateEvent(eventId, eventDetails) {
       }
     }
 
-    let query;
-    let queryParams;
-
-    if (isClientUser) {
-      // Si es cliente, solo actualizar título y fechas
-      query = `
-        UPDATE events 
-        SET title = ?,
-            start_datetime = ?,
-            end_datetime = ?
-        WHERE id = ?
-      `;
-      queryParams = [
-        eventDetails.title || currentEvent[0].title,
+    // Actualizar el evento en la base de datos
+    const [result] = await connection.query(
+      `UPDATE events 
+       SET title = ?,
+           start_datetime = ?,
+           end_datetime = ?
+       WHERE id = ?`,
+      [
+        eventDetails.title,
         formattedStartDate,
         formattedEndDate,
         eventId
-      ];
-    } else {
-      // Si es asesor o promotor, permitir actualizar todos los campos
-      query = `
-        UPDATE events 
-        SET title = ?,
-            start_datetime = ?,
-            end_datetime = ?,
-            event_type = ?,
-            client_id = ?
-        WHERE id = ?
-      `;
-      queryParams = [
-        eventDetails.title || currentEvent[0].title,
-        formattedStartDate,
-        formattedEndDate,
-        eventDetails.eventType || currentEvent[0].event_type,
-        eventDetails.clientId || currentEvent[0].client_id,
-        eventId
-      ];
-    }
-
-    const [result] = await connection.query(query, queryParams);
+      ]
+    );
 
     if (result.affectedRows === 0) {
       throw new Error('No se pudo actualizar el evento');
     }
 
-    // Retornar el evento actualizado con los campos apropiados
+    // Obtener el evento actualizado
+    const [updatedEvent] = await connection.query(
+      'SELECT * FROM events WHERE id = ?',
+      [eventId]
+    );
+
     return {
       id: eventId,
-      title: eventDetails.title || currentEvent[0].title,
-      start: formattedStartDate,
-      end: formattedEndDate,
-      eventType: currentEvent[0].event_type,
-      clientId: currentEvent[0].client_id,
-      createdBy: currentEvent[0].created_by,
-      meetLink: currentEvent[0].meet_link,
-      googleEventId: currentEvent[0].google_event_id
+      title: updatedEvent[0].title,
+      start: updatedEvent[0].start_datetime,
+      end: updatedEvent[0].end_datetime,
+      eventType: updatedEvent[0].event_type,
+      clientId: updatedEvent[0].client_id,
+      createdBy: updatedEvent[0].created_by,
+      meetLink: updatedEvent[0].meet_link,
+      googleEventId: updatedEvent[0].google_event_id
     };
   } catch (error) {
     console.error('Error al actualizar evento:', error);
     throw error;
   }
-}
+};
 
 /**
  * Eliminar un evento de la base de datos y de Google Calendar
